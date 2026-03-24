@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赏金阁 - Minecraft 整合包分享</title>
+    <link rel="stylesheet" href="/css/style.css?ver=2.0.0">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* 强制多列网格布局 - 覆盖所有可能的外部CSS */
+        .modpacks-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 25px !important;
+            width: 100% !important;
+        }
+        .members-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 30px !important;
+            width: 100% !important;
+        }
+        .modpack-card {
+            display: flex !important;
+            flex-direction: column !important;
+            min-width: 0 !important;
+        }
+        .member-card {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            min-width: 0 !important;
+        }
+        @media (max-width: 1024px) {
+            .modpacks-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+            .members-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+        @media (max-width: 640px) {
+            .modpacks-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .members-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>🎮 赏金阁</h1>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#" data-page="home" class="nav-link">首页</a></li>
+                <li><a href="#" data-page="members" class="nav-link">成员</a></li>
+                <li><a href="#" data-page="messages" class="nav-link">留言板</a></li>
+                <li id="user-menu">
+                    <a href="#" data-page="login" class="nav-link" id="login-link">登录</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <main class="container">
+        <!-- 首页 -->
+        <div id="home-page" class="page active">
+            <div class="page-header">
+                <h2>🎲 Minecraft 整合包</h2>
+                <button id="add-modpack-btn" class="btn btn-primary" style="display: none;">+ 新增整合包</button>
+            </div>
+            <div id="modpacks-grid" class="modpacks-grid">
+                <!-- 动态加载整合包卡片 -->
+            </div>
+        </div>
+
+        <!-- 成员页面 -->
+        <div id="members-page" class="page">
+            <div class="page-header">
+                <h2>👥 团队成员</h2>
+                <button id="add-member-btn" class="btn btn-primary" style="display: none;">+ 新增成员</button>
+            </div>
+            <div id="members-grid" class="members-grid">
+                <!-- 动态加载成员卡片 -->
+            </div>
+        </div>
+
+        <!-- 留言板页面 -->
+        <div id="messages-page" class="page">
+            <div class="page-header">
+                <h2>💬 留言板</h2>
+            </div>
+            <div class="messages-container">
+                <div id="messages-list" class="messages-list">
+                    <!-- 动态加载留言 -->
+                </div>
+                <div id="message-form-container" class="message-form-container" style="display: none;">
+                    <h3>发表留言</h3>
+                    <form id="message-form">
+                        <textarea id="message-content" class="form-control" rows="4" placeholder="写下你的留言..." required></textarea>
+                        <button type="submit" class="btn btn-primary">发布留言</button>
+                    </form>
+                </div>
+                <div id="login-to-message" class="login-prompt">
+                    <p>登录后即可发表留言</p>
+                    <button class="btn btn-secondary" onclick="app.navigate('login')">去登录</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 登录/注册页面 -->
+        <div id="login-page" class="page">
+            <div class="auth-container">
+                <div class="auth-tabs">
+                    <button class="tab-btn active" data-tab="login">登录</button>
+                    <button class="tab-btn" data-tab="register">注册</button>
+                </div>
+                
+                <!-- 登录表单 -->
+                <div id="login-form-container" class="tab-content active">
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="login-username">用户名</label>
+                            <input type="text" id="login-username" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">密码</label>
+                            <input type="password" id="login-password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">登录</button>
+                    </form>
+                </div>
+
+                <!-- 注册表单 -->
+                <div id="register-form-container" class="tab-content">
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="register-username">用户名</label>
+                            <input type="text" id="register-username" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">邮箱</label>
+                            <input type="email" id="register-email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">密码</label>
+                            <input type="password" id="register-password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">注册</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 个人中心页面 -->
+        <div id="profile-page" class="page">
+            <div class="profile-container">
+                <h2>个人中心</h2>
+                <div class="profile-info">
+                    <p><strong>用户名:</strong> <span id="profile-username"></span></p>
+                    <p><strong>邮箱:</strong> <span id="profile-email"></span></p>
+                    <p><strong>角色:</strong> <span id="profile-role"></span></p>
+                </div>
+                
+                <h3>修改密码</h3>
+                <form id="change-password-form">
+                    <div class="form-group">
+                        <label for="current-password">当前密码</label>
+                        <input type="password" id="current-password" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">新密码</label>
+                        <input type="password" id="new-password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">修改密码</button>
+                </form>
+
+                <button id="logout-btn" class="btn btn-danger">退出登录</button>
+            </div>
+        </div>
+
+        <!-- 审核页面（管理员） -->
+        <div id="review-page" class="page">
+            <div class="page-header">
+                <h2>🔍 审核管理</h2>
+            </div>
+            
+            <div class="review-section">
+                <h3>待审核的整合包</h3>
+                <div id="pending-modpacks" class="pending-list">
+                    <!-- 动态加载待审核整合包 -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 模态框（用于编辑和新增） -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- 动态内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <p>&copy; 2026 赏金阁 - Minecraft 整合包分享社区 | 机魂出品</p>
+    </footer>
+
+    <!-- 加载JavaScript -->
+    <script src="/js/app.js?v=202603241721"></script>
+</body>
+</html>

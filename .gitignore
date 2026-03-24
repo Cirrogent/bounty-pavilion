@@ -1,0 +1,15 @@
+node_modules/
+*.db
+*.sqlite
+.workbuddy/
+.env
+
+# uploads - 数据库文件不上传
+uploads/
+
+# 临时文档
+*.md
+*.bat
+白君-立即操作.txt
+强制刷新CSS.html
+最终-操作步骤.md
