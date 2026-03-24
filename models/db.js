@@ -78,6 +78,17 @@ function init() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
+    // 整合包评论表
+    db.run(`CREATE TABLE IF NOT EXISTS modpack_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      modpack_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+
     // 创建默认管理员账户
     createDefaultAdmin();
   });

@@ -5,6 +5,21 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
+// 加载环境变量
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+        const [key, ...valueParts] = line.split('=');
+        if (key && valueParts.length > 0) {
+            const value = valueParts.join('=').trim();
+            if (value) {
+                process.env[key.trim()] = value.replace(/^[\"']|[\"']$/g, '');
+            }
+        }
+    });
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -44,12 +59,16 @@ const modpackRoutes = require('./routes/modpacks');
 const memberRoutes = require('./routes/members');
 const messageRoutes = require('./routes/messages');
 const adminRoutes = require('./routes/admin');
+const commentRoutes = require('./routes/comments');
+const chatRoutes = require('./routes/chat');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/modpacks', modpackRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 静态文件服务 - uploads
 const uploadsServeDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads' : path.join(__dirname, 'uploads');

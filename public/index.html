@@ -6,6 +6,12 @@
     <title>赏金阁 - Minecraft 整合包分享</title>
     <link rel="stylesheet" href="/css/style.css?ver=2.0.0">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/images/logo.png" type="image/png">
+    
+    <!-- 背景音乐 -->
+    <audio id="background-music" loop>
+        <source src="/music/background.mp3" type="audio/mpeg">
+    </audio>
     <style>
         /* 强制多列网格布局 - 覆盖所有可能的外部CSS */
         .modpacks-grid {
@@ -54,7 +60,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <h1>🎮 赏金阁</h1>
+                <h1><img src="/images/logo.png" alt="工作台" style="width: 32px; height: 32px; vertical-align: middle; margin-right: 8px;"> <span style="color: #FFD700;">赏金阁</span></h1>
             </div>
             <ul class="nav-menu">
                 <li><a href="#" data-page="home" class="nav-link">首页</a></li>
@@ -72,8 +78,8 @@
         <!-- 首页 -->
         <div id="home-page" class="page active">
             <div class="page-header">
-                <h2>🎲 Minecraft 整合包</h2>
-                <button id="add-modpack-btn" class="btn btn-primary" style="display: none;">+ 新增整合包</button>
+            <h2><img src="/images/logo.png" alt="工作台" style="width: 28px; height: 28px; vertical-align: middle; margin-right: 8px;"> Minecraft 整合包</h2>
+            <button id="add-modpack-btn" class="btn btn-primary" style="display: none;">+ 新增整合包</button>
             </div>
             <div id="modpacks-grid" class="modpacks-grid">
                 <!-- 动态加载整合包卡片 -->
@@ -209,6 +215,73 @@
             </div>
             <div class="modal-body" id="modal-body">
                 <!-- 动态内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 整合包详情评论面板 -->
+    <div id="modpack-detail-overlay" class="modpack-detail-overlay"></div>
+    <div id="modpack-detail-panel" class="modpack-detail-panel">
+        <div class="panel-header">
+            <h3 class="panel-title">整合包详情</h3>
+            <button class="panel-close" id="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-content">
+            <div class="modpack-detail-info">
+                <img id="panel-modpack-image" class="modpack-detail-image" src="" alt="">
+                <h3 id="panel-modpack-title" class="modpack-detail-title"></h3>
+                <p id="panel-modpack-description" class="modpack-detail-description"></p>
+                <div class="modpack-detail-meta">
+                    <span id="panel-modpack-author"></span> | 
+                    <span id="panel-modpack-downloads"></span> | 
+                    <span id="panel-modpack-views"></span>
+                </div>
+            </div>
+            
+            <div class="comments-section">
+                <h4 class="comments-title">💬 评论</h4>
+                
+                <div class="comment-form" id="comment-form">
+                    <textarea id="comment-input" class="comment-textarea" placeholder="写下你的评论..." rows="3"></textarea>
+                    <button class="btn btn-primary" id="comment-submit-btn">发表评论</button>
+                </div>
+                
+                <div id="comments-list" class="comment-list">
+                    <!-- 动态加载评论 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI聊天机器人 -->
+    <div class="chatbot-container">
+        <div class="chatbot-window" id="chatbot-window">
+            <div class="chatbot-header">
+                <img src="/images/robot-avatar.png" alt="大川" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px;">
+                <span class="chatbot-title">大川</span>
+                <button class="chatbot-close" id="chatbot-close">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatbot-messages">
+                <div class="message bot">你好！我是大川，有什么关于Minecraft的问题都可以问我哦~</div>
+            </div>
+            <div class="chatbot-input-container">
+                <input type="text" class="chatbot-input" id="chatbot-input" placeholder="输入消息...">
+                <button class="chatbot-send" id="chatbot-send">➤</button>
+            </div>
+        </div>
+        <button class="chatbot-toggle" id="chatbot-toggle">
+            <img src="/images/robot-avatar.png" alt="大川" style="width: 32px; height: 32px; border-radius: 50%;">
+        </button>
+    </div>
+
+    <!-- 居中确认对话框 -->
+    <div id="center-confirm-modal" class="center-confirm-modal">
+        <div class="confirm-dialog">
+            <h3 id="confirm-title">确认操作</h3>
+            <p id="confirm-message">你确定要执行此操作吗？</p>
+            <div class="confirm-buttons">
+                <button class="btn btn-primary" id="confirm-yes">确定</button>
+                <button class="btn btn-secondary" id="confirm-no">取消</button>
             </div>
         </div>
     </div>

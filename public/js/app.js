@@ -137,6 +137,7 @@ function displayModpacks(modpacks) {
 function createModpackCard(modpack) {
     const card = document.createElement('div');
     card.className = 'modpack-card';
+    card.style.cursor = 'pointer';
     card.innerHTML = `
         ${currentUser && currentUser.role === 'admin' ? `
             <div class="admin-actions">
@@ -154,14 +155,20 @@ function createModpackCard(modpack) {
             <p class="modpack-description">${modpack.description}</p>
             <div class="modpack-actions">
                 ${modpack.download_link ? `
-                    <a href="${modpack.download_link}" target="_blank" class="btn btn-primary">下载</a>
+                    <a href="${modpack.download_link}" target="_blank" class="btn btn-primary" onclick="event.stopPropagation()">下载</a>
                 ` : ''}
                 ${!currentUser || currentUser.role !== 'admin' ? `
-                    <button class="btn btn-secondary" onclick="requestEdit(${modpack.id})">申请修改</button>
+                    <button class="btn btn-secondary" onclick="requestEdit(${modpack.id}); event.stopPropagation()">申请修改</button>
                 ` : ''}
             </div>
         </div>
     `;
+    
+    // 点击卡片显示详情和评论
+    card.addEventListener('click', () => {
+        showModpackDetail(modpack);
+    });
+    
     return card;
 }
 
@@ -561,7 +568,8 @@ function editMember(id) {
 
 // 删除整合包
 async function deleteModpack(id) {
-    if (!confirm('确定要删除这个整合包吗？')) {
+    const confirmed = await confirm('确定要删除这个整合包吗？', '删除确认');
+    if (!confirmed) {
         return;
     }
     
@@ -589,7 +597,8 @@ async function deleteModpack(id) {
 
 // 删除成员
 async function deleteMember(id) {
-    if (!confirm('确定要删除这个成员吗？')) {
+    const confirmed = await confirm('确定要删除这个成员吗？', '删除确认');
+    if (!confirmed) {
         return;
     }
     
@@ -838,8 +847,9 @@ async function handleChangePassword(e) {
 }
 
 // 处理退出登录
-function handleLogout() {
-    if (confirm('确定要退出登录吗？')) {
+async function handleLogout() {
+    const confirmed = await confirm('确定要退出登录吗？', '退出确认');
+    if (confirmed) {
         localStorage.removeItem('token');
         token = null;
         currentUser = null;
@@ -998,7 +1008,8 @@ function createPendingModpackItem(modpack) {
 
 // 批准整合包
 async function approveModpack(modpackId) {
-    if (!confirm('确定要批准这个整合包吗？批准后将显示在首页。')) {
+    const confirmed = await confirm('确定要批准这个整合包吗？批准后将显示在首页。', '批准确认');
+    if (!confirmed) {
         return;
     }
     
@@ -1027,7 +1038,8 @@ async function approveModpack(modpackId) {
 
 // 拒绝整合包
 async function rejectModpack(modpackId) {
-    if (!confirm('确定要拒绝这个整合包吗？拒绝后将被删除。')) {
+    const confirmed = await confirm('确定要拒绝这个整合包吗？拒绝后将被删除。', '拒绝确认');
+    if (!confirmed) {
         return;
     }
     
@@ -1052,6 +1064,359 @@ async function rejectModpack(modpackId) {
         alert('操作失败');
     }
 }
+
+// 显示整合包详情面板
+function showModpackDetail(modpack) {
+    const overlay = document.getElementById('modpack-detail-overlay');
+    const panel = document.getElementById('modpack-detail-panel');
+    
+    // 填充整合包信息
+    document.getElementById('panel-modpack-image').src = modpack.image_url || '/images/logo.png';
+    document.getElementById('panel-modpack-title').textContent = modpack.name;
+    document.getElementById('panel-modpack-description').textContent = modpack.description;
+    document.getElementById('panel-modpack-author').textContent = `作者：${modpack.author_name || '未知'}`;
+    document.getElementById('panel-modpack-downloads').textContent = `下载量：${modpack.downloads || 0}`;
+    document.getElementById('panel-modpack-views').textContent = `浏览量：${modpack.views || 0}`;
+    
+    // 存储当前整合包ID
+    panel.dataset.modpackId = modpack.id;
+    
+    // 加载评论
+    loadComments(modpack.id);
+    
+    // 显示面板
+    overlay.style.display = 'block';
+    panel.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// 隐藏整合包详情面板
+function hideModpackDetail() {
+    const overlay = document.getElementById('modpack-detail-overlay');
+    const panel = document.getElementById('modpack-detail-panel');
+    
+    panel.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    
+    setTimeout(() => {
+        overlay.style.display = 'none';
+    }, 300);
+}
+
+// 加载评论
+async function loadComments(modpackId) {
+    const container = document.getElementById('comments-list');
+    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">加载评论中...</p>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/comments/modpack/${modpackId}`);
+        
+        if (response.ok) {
+            const comments = await response.json();
+            displayComments(comments);
+        } else {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">加载评论失败</p>';
+        }
+    } catch (error) {
+        console.error('加载评论失败:', error);
+        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">加载评论失败</p>';
+    }
+}
+
+// 显示评论列表
+function displayComments(comments) {
+    const container = document.getElementById('comments-list');
+    container.innerHTML = '';
+    
+    if (comments.length === 0) {
+        container.innerHTML = '<p class="no-comments">暂无评论，快来发表第一条评论吧！</p>';
+        return;
+    }
+    
+    comments.forEach(comment => {
+        const commentEl = document.createElement('div');
+        commentEl.className = 'comment-item';
+        
+        const time = new Date(comment.created_at).toLocaleString('zh-CN');
+        
+        commentEl.innerHTML = `
+            <div class="comment-header">
+                <span class="comment-author">${comment.username}</span>
+                <span class="comment-time">${time}</span>
+            </div>
+            <div class="comment-content">${comment.content}</div>
+        `;
+        
+        container.appendChild(commentEl);
+    });
+}
+
+// 发表评论
+async function submitComment() {
+    if (!currentUser) {
+        alert('请先登录后再发表评论');
+        navigateToPage('login');
+        return;
+    }
+    
+    const panel = document.getElementById('modpack-detail-panel');
+    const modpackId = panel.dataset.modpackId;
+    const content = document.getElementById('comment-input').value.trim();
+    
+    if (!content) {
+        alert('请输入评论内容');
+        return;
+    }
+    
+    if (content.length > 500) {
+        alert('评论内容不能超过500字');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                modpackId: parseInt(modpackId),
+                content: content
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('comment-input').value = '';
+            loadComments(modpackId);
+        } else {
+            alert(data.error || '发表评论失败');
+        }
+    } catch (error) {
+        console.error('发表评论失败:', error);
+        alert('发表评论失败');
+    }
+}
+
+// 初始化评论面板事件
+function initCommentPanel() {
+    const overlay = document.getElementById('modpack-detail-overlay');
+    const panel = document.getElementById('modpack-detail-panel');
+    const closeBtn = document.getElementById('panel-close-btn');
+    const submitBtn = document.getElementById('comment-submit-btn');
+    
+    // 点击遮罩层关闭
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            hideModpackDetail();
+        }
+    });
+    
+    // 点击关闭按钮
+    closeBtn.addEventListener('click', hideModpackDetail);
+    
+    // 提交评论
+    submitBtn.addEventListener('click', submitComment);
+    
+    // 回车键发表评论
+    document.getElementById('comment-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submitComment();
+        }
+    });
+}
+
+// ==================== AI聊天机器人 ====================
+
+// 预设问答库
+const presetQA = {
+    '你好': '你好！我是大川，很高兴为你服务~',
+    'hi': 'Hello! 有什么可以帮助你的吗？',
+    'hello': '你好！欢迎来到赏金阁！',
+    '你是谁': '我是大川，赏金阁的智能助手，专门回答关于Minecraft的问题！',
+    '大川': '在呢！有什么想问的吗？',
+    'modpack': '整合包是Modpack的中文翻译，指包含多个MOD的Minecraft游戏包。你可以在赏金阁找到很多优质整合包！',
+    '整合包': '整合包能让你一次性体验多个MOD的组合玩法。推荐你浏览我们的整合包列表，找到感兴趣的下载试试！',
+    'minecraft': 'Minecraft（我的世界）是一款超好玩的沙盒游戏！在赏金阁我们专注于分享各种整合包。',
+    '我的世界': '《我的世界》是Minecraft的中文译名。需要我帮你推荐整合包吗？',
+    '怎么下载': '点击整合包的"下载"按钮即可跳转到下载页面。如果是普通用户提交的整合包，需要等待管理员审核通过。',
+    '审核': '普通用户提交的整合包需要管理员审核。审核通过后才会显示在首页。',
+    '管理员': '管理员可以管理整合包、成员，审核用户提交的内容。默认管理员账号是admin/admin123，登录后请立即修改密码！',
+    '密码': '如果你是管理员，请及时修改默认密码admin123！',
+    '感谢': '不客气！有问题随时找我~',
+    '谢谢': '不用谢！祝你游戏愉快！',
+    '再见': '再见！记得常来赏金阁看看哦~',
+    '拜拜': '拜拜！玩得开心！'
+};
+
+// 初始化聊天机器人
+function initChatbot() {
+    const toggle = document.getElementById('chatbot-toggle');
+    const window = document.getElementById('chatbot-window');
+    const close = document.getElementById('chatbot-close');
+    const send = document.getElementById('chatbot-send');
+    const input = document.getElementById('chatbot-input');
+    
+    // 切换聊天窗口
+    toggle.addEventListener('click', () => {
+        window.classList.toggle('active');
+        if (window.classList.contains('active')) {
+            input.focus();
+        }
+    });
+    
+    // 关闭聊天窗口
+    close.addEventListener('click', () => {
+        window.classList.remove('active');
+    });
+    
+    // 发送消息
+    send.addEventListener('click', sendChatMessage);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+}
+
+// 发送聊天消息
+async function sendChatMessage() {
+    const input = document.getElementById('chatbot-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // 显示用户消息
+    addChatMessage(message, 'user');
+    input.value = '';
+    
+    // 检查预设问答
+    const presetAnswer = getPresetAnswer(message);
+    if (presetAnswer) {
+        setTimeout(() => {
+            addChatMessage(presetAnswer, 'bot');
+        }, 500);
+        return;
+    }
+    
+    // 调用AI API
+    try {
+        const response = await fetch(`${API_BASE}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            addChatMessage(data.reply, 'bot');
+        } else {
+            addChatMessage('抱歉，我现在有点问题，请稍后再试。', 'bot');
+        }
+    } catch (error) {
+        console.error('聊天失败:', error);
+        addChatMessage('抱歉，我现在有点问题，请稍后再试。', 'bot');
+    }
+}
+
+// 获取预设回答
+function getPresetAnswer(message) {
+    const lowerMsg = message.toLowerCase();
+    
+    // 检查关键词匹配
+    for (const [key, answer] of Object.entries(presetQA)) {
+        if (lowerMsg.includes(key.toLowerCase())) {
+            return answer;
+        }
+    }
+    
+    return null;
+}
+
+// 添加聊天消息
+function addChatMessage(text, sender) {
+    const container = document.getElementById('chatbot-messages');
+    const message = document.createElement('div');
+    message.className = `message ${sender}`;
+    message.textContent = text;
+    container.appendChild(message);
+    container.scrollTop = container.scrollHeight;
+}
+
+// ==================== 背景音乐 ====================
+
+// 播放背景音乐
+function playBackgroundMusic() {
+    const music = document.getElementById('background-music');
+    
+    // 尝试播放音乐（需要用户交互）
+    document.addEventListener('click', () => {
+        if (music.paused) {
+            music.volume = 0.3; // 设置音量为30%
+            music.play().catch(e => {
+                console.log('自动播放被阻止:', e);
+            });
+        }
+    }, { once: true });
+}
+
+// ==================== 居中确认对话框 ====================
+
+// 替换原生的confirm函数
+window.originalConfirm = window.confirm;
+
+window.confirm = function(message, title = '确认操作') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('center-confirm-modal');
+        const titleEl = document.getElementById('confirm-title');
+        const messageEl = document.getElementById('confirm-message');
+        const yesBtn = document.getElementById('confirm-yes');
+        const noBtn = document.getElementById('confirm-no');
+        
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        modal.classList.add('active');
+        
+        // 确定按钮
+        yesBtn.onclick = () => {
+            modal.classList.remove('active');
+            resolve(true);
+        };
+        
+        // 取消按钮
+        noBtn.onclick = () => {
+            modal.classList.remove('active');
+            resolve(false);
+        };
+        
+        // ESC键取消
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                modal.classList.remove('active');
+                document.removeEventListener('keydown', escHandler);
+                resolve(false);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    });
+}
+
+// 初始化所有功能
+function initAllFeatures() {
+    initCommentPanel();
+    initChatbot();
+    playBackgroundMusic();
+}
+
+// 初始化时调用
+initAllFeatures();
 
 // 全局方法（供HTML调用）
 window.app = {
