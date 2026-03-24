@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
@@ -10,88 +10,106 @@ if (!fs.existsSync(dataDir)) {
 }
 const dbPath = path.join(dataDir, 'bounty-pavilion.db');
 console.log(`📁 数据库路径: ${dbPath}`);
-const db = new sqlite3.Database(dbPath);
 
-// 初始化数据库表
-function init() {
-  db.serialize(() => {
-    // 用户表
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username VARCHAR(50) UNIQUE NOT NULL,
-      email VARCHAR(100) UNIQUE NOT NULL,
-      password VARCHAR(255) NOT NULL,
-      role VARCHAR(20) DEFAULT 'user',
-      avatar VARCHAR(255),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+let db = null;
 
-    // 整合包表
-    db.run(`CREATE TABLE IF NOT EXISTS modpacks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name VARCHAR(100) NOT NULL,
-      description TEXT NOT NULL,
-      image_url VARCHAR(255),
-      download_link VARCHAR(255),
-      author_id INTEGER,
-      status VARCHAR(20) DEFAULT 'published',
-      views INTEGER DEFAULT 0,
-      downloads INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (author_id) REFERENCES users(id)
-    )`);
+// 初始化数据库
+async function init() {
+  const SQL = await initSqlJs();
 
-    // 成员表
-    db.run(`CREATE TABLE IF NOT EXISTS members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name VARCHAR(50) NOT NULL,
-      avatar_url VARCHAR(255),
-      role VARCHAR(50),
-      description TEXT,
-      join_date DATE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+  // 加载或创建数据库
+  if (fs.existsSync(dbPath)) {
+    const buffer = fs.readFileSync(dbPath);
+    db = new SQL.Database(buffer);
+    console.log('✅ 数据库加载成功');
+  } else {
+    db = new SQL.Database();
+    console.log('✅ 新数据库创建成功');
+  }
 
-    // 留言表
-    db.run(`CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      parent_id INTEGER DEFAULT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (parent_id) REFERENCES messages(id)
-    )`);
+  // 创建表
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'user',
+    avatar VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    // 修改申请表（普通用户提交修改申请）
-    db.run(`CREATE TABLE IF NOT EXISTS modpack_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      modpack_id INTEGER,
-      user_id INTEGER NOT NULL,
-      type VARCHAR(20) NOT NULL,
-      data TEXT NOT NULL,
-      status VARCHAR(20) DEFAULT 'pending',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
+  db.run(`CREATE TABLE IF NOT EXISTS modpacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL,
+    description TEXT NOT NULL,
+    image_url VARCHAR(255),
+    download_link VARCHAR(255),
+    author_id INTEGER,
+    status VARCHAR(20) DEFAULT 'published',
+    views INTEGER DEFAULT 0,
+    downloads INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+  )`);
 
-    // 整合包评论表
-    db.run(`CREATE TABLE IF NOT EXISTS modpack_comments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      modpack_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
+  db.run(`CREATE TABLE IF NOT EXISTS members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(50) NOT NULL,
+    avatar_url VARCHAR(255),
+    role VARCHAR(50),
+    description TEXT,
+    join_date DATE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    // 创建默认管理员账户
-    createDefaultAdmin();
-  });
+  db.run(`CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    parent_id INTEGER DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_id) REFERENCES messages(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS modpack_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    modpack_id INTEGER,
+    user_id INTEGER NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    data TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS modpack_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    modpack_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+
+  // 保存数据库到文件
+  saveDb();
+
+  // 创建默认管理员
+  await createDefaultAdmin();
+}
+
+// 保存数据库到文件
+function saveDb() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
 }
 
 // 创建默认管理员
@@ -100,53 +118,45 @@ async function createDefaultAdmin() {
   const adminPassword = 'admin123';
   const adminEmail = 'admin@bountypavilion.com';
 
-  db.get('SELECT * FROM users WHERE username = ?', [adminUsername], async (err, row) => {
-    if (!row) {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      db.run(
-        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
-        [adminUsername, adminEmail, hashedPassword, 'admin'],
-        (err) => {
-          if (err) {
-            console.error('创建默认管理员失败:', err);
-          } else {
-            console.log('✅ 默认管理员账户创建成功！');
-            console.log(`用户名: ${adminUsername}`);
-            console.log(`密码: ${adminPassword}`);
-            console.log('⚠️  请登录后立即修改默认密码！');
-          }
-        }
-      );
-    }
-  });
+  const result = query('SELECT * FROM users WHERE username = ?', [adminUsername]);
+  if (result.length === 0) {
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    run(
+      'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+      [adminUsername, adminEmail, hashedPassword, 'admin']
+    );
+    console.log('✅ 默认管理员账户创建成功！');
+    console.log(`用户名: ${adminUsername}`);
+    console.log(`密码: ${adminPassword}`);
+    console.log('⚠️  请登录后立即修改默认密码！');
+  }
 }
 
-// 查询方法
+// 查询方法 - 返回行数组
 function query(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return rows;
 }
 
+// 获取单行
 function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+  const rows = query(sql, params);
+  return rows.length > 0 ? rows[0] : null;
 }
 
+// 执行写入操作
 function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ id: this.lastID, changes: this.changes });
-    });
-  });
+  db.run(sql, params);
+  const changes = db.getRowsModified();
+  const lastId = query("SELECT last_insert_rowid() as id")[0].id;
+  saveDb(); // 每次写入后保存
+  return { id: lastId, changes };
 }
 
 module.exports = {
