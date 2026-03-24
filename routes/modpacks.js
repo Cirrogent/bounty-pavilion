@@ -8,9 +8,13 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // 配置文件上传
+const getUploadDir = () => {
+  return process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/modpacks' : path.join(__dirname, '..', 'uploads', 'modpacks');
+};
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'modpacks');
+    const uploadDir = getUploadDir();
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -156,7 +160,9 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), asyn
     if (req.file) {
       // 删除旧图片
       if (modpack.image_url) {
-        const oldImagePath = path.join(__dirname, '..', modpack.image_url);
+        const oldImagePath = process.env.RAILWAY_ENVIRONMENT
+          ? path.join('/tmp', modpack.image_url)
+          : path.join(__dirname, '..', modpack.image_url);
         if (fs.existsSync(oldImagePath)) {
           fs.unlinkSync(oldImagePath);
         }
@@ -191,7 +197,9 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     
     // 删除图片文件
     if (modpack.image_url) {
-      const imagePath = path.join(__dirname, '..', modpack.image_url);
+      const imagePath = process.env.RAILWAY_ENVIRONMENT
+        ? path.join('/tmp', modpack.image_url)
+        : path.join(__dirname, '..', modpack.image_url);
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
       }

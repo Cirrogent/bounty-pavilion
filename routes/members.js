@@ -10,7 +10,7 @@ const router = express.Router();
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'members');
+    const uploadDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/members' : path.join(__dirname, '..', 'uploads', 'members');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -117,7 +117,9 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('avatar'), asy
     if (req.file) {
       // 删除旧图片
       if (member.avatar_url) {
-        const oldImagePath = path.join(__dirname, '..', member.avatar_url);
+        const oldImagePath = process.env.RAILWAY_ENVIRONMENT
+          ? path.join('/tmp', member.avatar_url)
+          : path.join(__dirname, '..', member.avatar_url);
         if (fs.existsSync(oldImagePath)) {
           fs.unlinkSync(oldImagePath);
         }
@@ -152,7 +154,9 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     
     // 删除图片文件
     if (member.avatar_url) {
-      const imagePath = path.join(__dirname, '..', member.avatar_url);
+      const imagePath = process.env.RAILWAY_ENVIRONMENT
+        ? path.join('/tmp', member.avatar_url)
+        : path.join(__dirname, '..', member.avatar_url);
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
       }

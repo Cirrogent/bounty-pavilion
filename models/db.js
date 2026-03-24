@@ -1,8 +1,15 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
-const dbPath = path.join(__dirname, '..', 'bounty-pavilion.db');
+// 数据库路径：Railway上使用/tmp持久化目录，本地使用项目根目录
+const dataDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/data' : path.join(__dirname, '..');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+const dbPath = path.join(dataDir, 'bounty-pavilion.db');
+console.log(`📁 数据库路径: ${dbPath}`);
 const db = new sqlite3.Database(dbPath);
 
 // 初始化数据库表
