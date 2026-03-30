@@ -1788,3 +1788,419 @@ body.theme-ocean {
         font-size: 16px;
     }
 }
+
+/* ==================== 珍宝阁样式 ==================== */
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    padding: 10px;
+}
+
+.gallery-item {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+}
+
+.gallery-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.gallery-item-img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+    background: var(--secondary-color);
+}
+
+.gallery-item-video {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    background: #000;
+}
+
+.gallery-item-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+    padding: 30px 12px 12px;
+    color: #fff;
+}
+
+.gallery-item-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gallery-item-meta {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gallery-item-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    pointer-events: none;
+}
+
+/* 珍宝阁详情页 */
+.gallery-detail-container {
+    display: flex;
+    gap: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: calc(100vh - 200px);
+}
+
+.gallery-detail-left {
+    flex: 1;
+    min-width: 0;
+    position: sticky;
+    top: 80px;
+    align-self: flex-start;
+}
+
+.gallery-detail-image-wrap {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    text-align: center;
+}
+
+.gallery-detail-image-wrap img {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+.gallery-detail-image-wrap video {
+    max-width: 100%;
+    max-height: 75vh;
+}
+
+.gallery-detail-info {
+    padding: 16px 0;
+}
+
+.gallery-detail-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.gallery-detail-description {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.gallery-detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.gallery-detail-meta img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+/* 珍宝阁右侧评论区 */
+.gallery-detail-right {
+    width: 360px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 120px);
+    position: sticky;
+    top: 80px;
+}
+
+.gallery-comments-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gallery-comments-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.gallery-comment-item {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gallery-comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.gallery-comment-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.gallery-comment-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-accent);
+}
+
+.gallery-comment-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.gallery-comment-content {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    padding-left: 36px;
+}
+
+.gallery-comment-delete {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.gallery-comment-item:hover .gallery-comment-delete {
+    opacity: 1;
+}
+
+.gallery-comment-delete:hover {
+    color: #ef4444;
+}
+
+.gallery-comment-reply-trigger {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-left: 8px;
+}
+
+.gallery-comment-item:hover .gallery-comment-reply-trigger {
+    opacity: 1;
+}
+
+.gallery-comment-reply-trigger:hover {
+    color: var(--text-accent);
+}
+
+/* 嵌套回复 */
+.gallery-comment-replies {
+    margin-left: 36px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 评论输入框 */
+.gallery-comment-input-wrap {
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 12px;
+}
+
+.gallery-comment-input-wrap textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--secondary-color);
+    color: var(--text-primary);
+    font-size: 13px;
+    resize: vertical;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.gallery-comment-input-wrap textarea:focus {
+    border-color: var(--primary-color);
+}
+
+.gallery-comment-input-wrap .btn-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+/* 上传/申请弹窗 */
+.gallery-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.gallery-modal {
+    background: var(--secondary-color);
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    padding: 30px;
+    width: 480px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.gallery-modal h3 {
+    font-size: 20px;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+}
+
+.gallery-modal label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.gallery-modal input,
+.gallery-modal textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.gallery-modal input:focus,
+.gallery-modal textarea:focus {
+    border-color: var(--primary-color);
+}
+
+.gallery-modal textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.gallery-file-upload {
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 16px;
+}
+
+.gallery-file-upload:hover {
+    border-color: var(--primary-color);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.gallery-file-upload.has-file {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.gallery-file-upload .file-preview {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.gallery-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .gallery-detail-container {
+        flex-direction: column;
+    }
+    .gallery-detail-left {
+        position: static;
+    }
+    .gallery-detail-right {
+        width: 100%;
+        position: static;
+        max-height: none;
+    }
+    .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    .gallery-item-img,
+    .gallery-item-video {
+        height: 160px;
+    }
+}

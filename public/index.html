@@ -60,6 +60,7 @@
             <ul class="nav-menu">
                 <li><a href="#" data-page="home" class="nav-link">首页</a></li>
                 <li><a href="#" data-page="stories" class="nav-link">野史趣事</a></li>
+                <li><a href="#" data-page="gallery" class="nav-link">珍宝阁</a></li>
                 <li><a href="#" data-page="members" class="nav-link">成员</a></li>
                 <li><a href="#" data-page="messages" class="nav-link">留言板</a></li>
                 <li class="theme-switcher">
@@ -337,6 +338,28 @@
             <!-- 动态加载文章详情 -->
         </div>
 
+        <!-- 珍宝阁页面 -->
+        <div id="gallery-page" class="page">
+            <div class="page-header">
+                <h2><img src="/images/huakuang-zuanshi.jpg" alt="💎" style="width: 36px; height: 36px; vertical-align: middle; margin-right: 8px; border-radius: 4px;"> 珍宝阁</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button id="gallery-apply-btn" class="btn btn-secondary" style="display: none;">📤 申请上传</button>
+                    <button id="gallery-upload-btn" class="btn btn-primary" style="display: none;">📷 上传</button>
+                </div>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 20px; text-align: center;">记录每一个珍贵瞬间，每一个都比钻石更宝贵</p>
+            <div id="gallery-grid" class="gallery-grid">
+                <!-- 动态加载 -->
+            </div>
+            <div id="gallery-load-more" style="text-align: center; margin-top: 20px; display: none;">
+                <button onclick="loadMoreGallery()" class="btn btn-secondary">加载更多</button>
+            </div>
+        </div>
+
+        <!-- 珍宝阁详情页面（照片大图 + 右侧评论） -->
+        <div id="gallery-detail-page" class="page">
+        </div>
+
         <!-- 审核页面（管理员） -->
         <div id="review-page" class="page">
             <div class="page-header">
@@ -347,6 +370,13 @@
                 <h3>待审核的整合包</h3>
                 <div id="pending-modpacks" class="pending-list">
                     <!-- 动态加载待审核整合包 -->
+                </div>
+            </div>
+
+            <div class="review-section" style="margin-top: 30px;">
+                <h3>💎 珍宝阁上传申请</h3>
+                <div id="pending-gallery-applications" class="pending-list">
+                    <!-- 动态加载待审核珍宝阁申请 -->
                 </div>
             </div>
         </div>

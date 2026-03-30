@@ -180,6 +180,51 @@ async function init() {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)`);
 
+  // 珍宝阁 - 相册表
+  db.run(`CREATE TABLE IF NOT EXISTS gallery (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(255),
+    file_type VARCHAR(10) DEFAULT 'image',
+    uploader_id INTEGER NOT NULL,
+    uploader_name VARCHAR(50),
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'published',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uploader_id) REFERENCES users(id)
+  )`);
+
+  // 珍宝阁 - 评论表
+  db.run(`CREATE TABLE IF NOT EXISTS gallery_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gallery_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    parent_id INTEGER DEFAULT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (gallery_id) REFERENCES gallery(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_id) REFERENCES gallery_comments(id)
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_gallery_comments_parent ON gallery_comments(parent_id)`);
+
+  // 珍宝阁 - 上传申请表
+  db.run(`CREATE TABLE IF NOT EXISTS gallery_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(255),
+    file_type VARCHAR(10) DEFAULT 'image',
+    status VARCHAR(20) DEFAULT 'pending',
+    reject_reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at DATETIME,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+
   // 兼容旧数据库：确保字段存在
   try { db.run(`ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 0`); } catch(e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN verification_code VARCHAR(10)`); } catch(e) {}

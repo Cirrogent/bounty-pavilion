@@ -120,6 +120,9 @@ function loadPageData(page) {
         case 'review':
             loadReviewPage();
             break;
+        case 'gallery':
+            loadGalleryPage();
+            break;
     }
 }
 
@@ -1348,10 +1351,21 @@ function updateNavigation() {
 function updateAdminFeatures() {
     const addModpackBtn = document.getElementById('add-modpack-btn');
     const addMemberBtn = document.getElementById('add-member-btn');
+    const galleryUploadBtn = document.getElementById('gallery-upload-btn');
+    const galleryApplyBtn = document.getElementById('gallery-apply-btn');
     
     if (currentUser) {
         // 所有登录用户都可以添加整合包
         addModpackBtn.style.display = 'block';
+        
+        // 珍宝阁：管理员显示上传按钮，普通用户显示申请按钮
+        if (currentUser.role === 'admin') {
+            galleryUploadBtn.style.display = 'inline-block';
+            galleryApplyBtn.style.display = 'none';
+        } else {
+            galleryUploadBtn.style.display = 'none';
+            galleryApplyBtn.style.display = 'inline-block';
+        }
         
         // 只有管理员可以管理成员和查看审核
         if (currentUser.role === 'admin') {
@@ -1377,6 +1391,8 @@ function updateAdminFeatures() {
     } else {
         addModpackBtn.style.display = 'none';
         addMemberBtn.style.display = 'none';
+        if (galleryUploadBtn) galleryUploadBtn.style.display = 'none';
+        if (galleryApplyBtn) galleryApplyBtn.style.display = 'none';
     }
 }
 
@@ -1404,6 +1420,19 @@ async function loadReviewPage() {
     } catch (error) {
         console.error('加载审核列表失败:', error);
         showError('加载审核列表失败');
+    }
+
+    // 加载珍宝阁申请
+    try {
+        const res = await fetch(`${API_BASE}/gallery/admin/applications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const apps = await res.json();
+            displayGalleryApplications(apps);
+        }
+    } catch (e) {
+        console.error('加载珍宝阁申请失败:', e);
     }
 }
 
@@ -2691,6 +2720,8 @@ function getNotificationIcon(type) {
         'comment_reply': '↩️',
         'modpack_approved': '✅',
         'modpack_rejected': '❌',
+        'gallery_approved': '💎',
+        'gallery_rejected': '🚫',
         'admin': '👑'
     };
     return icons[type] || '📢';
@@ -3553,4 +3584,459 @@ function initParticles() {
     
     // 初始检查
     checkHomePageActive();
+}
+
+// ==================== 珍宝阁功能 ====================
+
+let galleryCurrentPage = 1;
+let galleryHasMore = true;
+let galleryLoading = false;
+
+// 加载珍宝阁页面
+async function loadGalleryPage() {
+    galleryCurrentPage = 1;
+    galleryHasMore = true;
+    document.getElementById('gallery-grid').innerHTML = '';
+    document.getElementById('gallery-load-more').style.display = 'none';
+
+    const uploadBtn = document.getElementById('gallery-upload-btn');
+    const applyBtn = document.getElementById('gallery-apply-btn');
+    
+    if (uploadBtn) uploadBtn.onclick = () => showGalleryUploadModal(false);
+    if (applyBtn) applyBtn.onclick = () => showGalleryUploadModal(true);
+
+    await loadGalleryItems();
+}
+
+// 加载珍宝阁列表
+async function loadGalleryItems() {
+    if (galleryLoading) return;
+    galleryLoading = true;
+
+    try {
+        const response = await fetch(API_BASE + '/gallery?page=' + galleryCurrentPage + '&limit=12');
+        if (!response.ok) throw new Error('加载失败');
+        const data = await response.json();
+
+        const grid = document.getElementById('gallery-grid');
+        data.items.forEach(item => {
+            grid.appendChild(createGalleryCard(item));
+        });
+
+        galleryHasMore = data.page < data.totalPages;
+        document.getElementById('gallery-load-more').style.display = galleryHasMore ? 'block' : 'none';
+    } catch (error) {
+        console.error('加载珍宝阁失败:', error);
+        document.getElementById('gallery-grid').innerHTML = '<p style="text-align:center;color:var(--text-secondary);grid-column:1/-1;padding:40px;">暂无内容，快来上传第一张照片吧</p>';
+    } finally {
+        galleryLoading = false;
+    }
+}
+
+// 加载更多
+async function loadMoreGallery() {
+    galleryCurrentPage++;
+    await loadGalleryItems();
+}
+
+// 创建照片卡片
+function createGalleryCard(item) {
+    const div = document.createElement('div');
+    div.className = 'gallery-item';
+    div.onclick = () => showGalleryDetail(item.id);
+
+    const isVideo = item.file_type === 'video';
+    const src = item.image_url || '/images/default-avatar.svg';
+    const name = item.uploader_display || item.uploader_username || '匿名';
+    const likes = item.likes || 0;
+    const views = item.views || 0;
+
+    if (isVideo) {
+        div.innerHTML = '<div class="gallery-item-video"><video src="' + src + '" preload="metadata" muted></video><div class="gallery-item-play">▶</div></div>';
+    } else {
+        div.innerHTML = '<img src="' + src + '" class="gallery-item-img" alt="' + item.title + '" loading="lazy">';
+    }
+    div.innerHTML += '<div class="gallery-item-overlay"><div class="gallery-item-title">' + item.title + '</div><div class="gallery-item-meta"><span>📷 ' + name + '</span><span>❤️ ' + likes + '</span><span>👁️ ' + views + '</span></div></div>';
+
+    return div;
+}
+
+// 显示详情（左图右评论）
+async function showGalleryDetail(id) {
+    navigateToPage('gallery-detail');
+    const container = document.getElementById('gallery-detail-page');
+    container.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text-secondary);">加载中...</div>';
+
+    try {
+        const [itemRes, commentsRes] = await Promise.all([
+            fetch(API_BASE + '/gallery/' + id),
+            fetch(API_BASE + '/gallery/' + id + '/comments')
+        ]);
+
+        if (!itemRes.ok) throw new Error('内容不存在');
+        const item = await itemRes.json();
+        const comments = commentsRes.ok ? await commentsRes.json() : [];
+
+        const isVideo = item.file_type === 'video';
+        const uName = item.uploader_display || item.uploader_username || '匿名';
+        const uAvatar = item.uploader_avatar || '/images/default-avatar.svg';
+        const timeStr = new Date(item.created_at + 'Z').toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        let mediaHtml = isVideo 
+            ? '<video src="' + item.image_url + '" controls autoplay style="max-width:100%;max-height:75vh;"></video>'
+            : '<img src="' + item.image_url + '" alt="' + item.title + '">';
+        
+        let adminBtn = '';
+        if (currentUser && currentUser.role === 'admin') {
+            adminBtn = '<button onclick="deleteGalleryItem(' + item.id + ')" class="btn btn-danger" style="padding:6px 14px;font-size:13px;float:right;">🗑️ 删除</button>';
+        }
+
+        let commentsHtml = comments.length === 0 
+            ? '<p style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;">暂无评论，来说点什么吧</p>'
+            : comments.map(c => renderGalleryComment(c, item.id)).join('');
+
+        let commentFormHtml = '';
+        if (currentUser) {
+            commentFormHtml = '<div class="gallery-comment-input-wrap"><textarea id="gallery-comment-input" placeholder="写下你的评论..." rows="2"></textarea><div class="btn-row"><button onclick="submitGalleryComment(' + item.id + ')" class="btn btn-primary" style="padding:8px 20px;font-size:13px;">发表评论</button></div></div>';
+        } else {
+            commentFormHtml = '<p style="text-align:center;color:var(--text-muted);padding:12px;font-size:13px;border-top:1px solid var(--border-color);margin-top:12px;">登录后可以发表评论</p>';
+        }
+
+        let descHtml = item.description ? '<div class="gallery-detail-description">' + item.description + '</div>' : '';
+
+        container.innerHTML = '<div class="gallery-detail-container">' +
+            '<div class="gallery-detail-left">' +
+            '<div style="margin-bottom:12px;"><button onclick="navigateToPage(\'gallery\')" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;">← 返回珍宝阁</button>' + adminBtn + '</div>' +
+            '<div class="gallery-detail-image-wrap">' + mediaHtml + '</div>' +
+            '<div class="gallery-detail-info">' +
+            '<div class="gallery-detail-title">' + item.title + '</div>' +
+            descHtml +
+            '<div class="gallery-detail-meta">' +
+            '<img src="' + uAvatar + '" onerror="this.src=\'/images/default-avatar.svg\'">' +
+            '<span>' + uName + '</span>' +
+            '<span>📅 ' + timeStr + '</span>' +
+            '<span>👁️ ' + item.views + '</span>' +
+            '<span style="cursor:pointer;" onclick="likeGalleryItem(' + item.id + ', this)">❤️ <span>' + item.likes + '</span></span>' +
+            '</div></div></div>' +
+            '<div class="gallery-detail-right">' +
+            '<div class="gallery-comments-header">💬 评论 (' + comments.length + ')</div>' +
+            '<div class="gallery-comments-list" id="gallery-comments-list">' + commentsHtml + '</div>' +
+            commentFormHtml +
+            '</div></div>';
+
+    } catch (error) {
+        container.innerHTML = '<div style="text-align:center;padding:60px;color:#ff6b6b;">加载失败：' + error.message + '</div>';
+    }
+}
+
+// 渲染评论
+function renderGalleryComment(comment, galleryId) {
+    const avatar = comment.avatar || '/images/default-avatar.svg';
+    const name = comment.display_name || comment.username || '未知用户';
+    const timeStr = new Date(comment.created_at + 'Z').toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const canDelete = currentUser && (currentUser.id === comment.user_id || currentUser.role === 'admin');
+    const safeName = (name || '').replace(/'/g, "\\'");
+
+    let actionsHtml = '';
+    if (canDelete) actionsHtml += '<span class="gallery-comment-delete" onclick="deleteGalleryComment(' + galleryId + ',' + comment.id + ')">删除</span>';
+    if (currentUser) actionsHtml += '<span class="gallery-comment-reply-trigger" onclick="toggleGalleryReply(' + comment.id + ',&#39;' + safeName + '&#39;)">回复</span>';
+
+    let h = '<div class="gallery-comment-item" data-comment-id="' + comment.id + '">';
+    h += '<div class="gallery-comment-header">';
+    h += '<img src="' + avatar + '" class="gallery-comment-avatar" onerror="this.src=\'/images/default-avatar.svg\'">';
+    h += '<span class="gallery-comment-name">' + name + '</span>';
+    h += '<span class="gallery-comment-time">' + timeStr + '</span>';
+    h += actionsHtml;
+    h += '</div>';
+    h += '<div class="gallery-comment-content">' + comment.content + '</div>';
+    h += '<div id="gallery-reply-box-' + comment.id + '"></div>';
+    h += '</div>';
+    return h;
+}
+
+// 切换回复框
+function toggleGalleryReply(commentId, replyToName) {
+    const box = document.getElementById('gallery-reply-box-' + commentId);
+    if (box.innerHTML) { box.innerHTML = ''; return; }
+    const textareaId = 'gallery-reply-input-' + commentId;
+    const boxId = 'gallery-reply-box-' + commentId;
+    let h = '<div style="margin-top:8px;padding-left:4px;">';
+    h += '<textarea id="' + textareaId + '" placeholder="回复 ' + replyToName + '..." rows="2" style="width:100%;min-height:40px;padding:8px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);color:var(--text-primary);font-size:12px;resize:none;outline:none;font-family:inherit;box-sizing:border-box;"></textarea>';
+    h += '<div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">';
+    h += '<button onclick="document.getElementById(\'' + boxId + '\').innerHTML=\'\'" class="btn btn-secondary" style="padding:4px 12px;font-size:12px;">取消</button>';
+    h += '<button onclick="submitGalleryReply(' + commentId + ')" class="btn btn-primary" style="padding:4px 12px;font-size:12px;">回复</button>';
+    h += '</div></div>';
+    box.innerHTML = h;
+    document.getElementById(textareaId).focus();
+}
+
+// 提交评论
+async function submitGalleryComment(galleryId) {
+    const input = document.getElementById('gallery-comment-input');
+    const content = input.value.trim();
+    if (!content) { showError('评论内容不能为空'); return; }
+
+    try {
+        const formData = new FormData();
+        formData.append('content', content);
+        const response = await fetch(API_BASE + '/gallery/' + galleryId + '/comments', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: formData
+        });
+        if (response.ok) {
+            input.value = '';
+            showSuccessMessage('评论发表成功');
+            showGalleryDetail(galleryId);
+        } else {
+            const data = await response.json();
+            showError(data.error || '评论失败');
+        }
+    } catch (error) { showError('评论失败'); }
+}
+
+// 提交回复
+async function submitGalleryReply(parentId) {
+    const input = document.getElementById('gallery-reply-input-' + parentId);
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) { showError('回复内容不能为空'); return; }
+
+    const pageHtml = document.getElementById('gallery-detail-page').innerHTML;
+    const match = pageHtml.match(/submitGalleryComment\((\d+)\)/);
+    const galleryId = match ? parseInt(match[1]) : null;
+    if (!galleryId) { showError('操作失败'); return; }
+
+    try {
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('parent_id', parentId);
+        const response = await fetch(API_BASE + '/gallery/' + galleryId + '/comments', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: formData
+        });
+        if (response.ok) {
+            showSuccessMessage('回复成功');
+            showGalleryDetail(galleryId);
+        } else {
+            const data = await response.json();
+            showError(data.error || '回复失败');
+        }
+    } catch (error) { showError('回复失败'); }
+}
+
+// 删除评论
+async function deleteGalleryComment(galleryId, commentId) {
+    if (!confirm('确定删除这条评论吗？')) return;
+    try {
+        const response = await fetch(API_BASE + '/gallery/' + galleryId + '/comments/' + commentId, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) { showSuccessMessage('评论已删除'); showGalleryDetail(galleryId); }
+        else showError('删除失败');
+    } catch (error) { showError('删除失败'); }
+}
+
+// 点赞
+async function likeGalleryItem(id, el) {
+    try {
+        const response = await fetch(API_BASE + '/gallery/' + id + '/like', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) {
+            const countEl = el.querySelector('span');
+            countEl.textContent = parseInt(countEl.textContent) + 1;
+            el.style.transform = 'scale(1.3)';
+            setTimeout(() => el.style.transform = 'scale(1)', 200);
+        }
+    } catch (error) { showError('操作失败'); }
+}
+
+// 删除照片
+async function deleteGalleryItem(id) {
+    if (!confirm('确定删除这张照片吗？删除后不可恢复。')) return;
+    try {
+        const response = await fetch(API_BASE + '/gallery/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) { showSuccessMessage('删除成功'); navigateToPage('gallery'); }
+        else showError('删除失败');
+    } catch (error) { showError('删除失败'); }
+}
+
+// 显示上传弹窗
+function showGalleryUploadModal(isApply) {
+    const existing = document.querySelector('.gallery-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gallery-modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    const titleText = isApply ? '📤 申请上传照片' : '📷 上传照片/视频';
+    const submitText = isApply ? '提交申请' : '上传';
+    const desc = isApply ? '提交后需等待管理员审核通过才会展示' : '上传后直接展示在珍宝阁中';
+
+    overlay.innerHTML = '<div class="gallery-modal">' +
+        '<h3>' + titleText + '</h3>' +
+        '<p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">' + desc + '</p>' +
+        '<label>标题 *</label>' +
+        '<input type="text" id="gallery-upload-title" placeholder="给照片取个名字" maxlength="200">' +
+        '<label>介绍</label>' +
+        '<textarea id="gallery-upload-desc" placeholder="写点关于这张照片的介绍..." rows="3"></textarea>' +
+        '<label>选择文件 *</label>' +
+        '<div class="gallery-file-upload" id="gallery-file-upload" onclick="document.getElementById(\'gallery-file-input\').click()">' +
+        '<div style="font-size:36px;margin-bottom:8px;">📁</div>' +
+        '<div style="color:var(--text-secondary);font-size:14px;">点击选择图片或视频</div>' +
+        '<div style="color:var(--text-muted);font-size:12px;margin-top:4px;">支持 JPG/PNG/GIF/WebP/MP4，图片最大10MB，视频最大50MB</div>' +
+        '</div>' +
+        '<input type="file" id="gallery-file-input" accept="image/*,video/mp4,video/webm" style="display:none;" onchange="previewGalleryFile(this)">' +
+        '<div class="gallery-modal-actions">' +
+        '<button onclick="this.closest(\'.gallery-modal-overlay\').remove()" class="btn btn-secondary">取消</button>' +
+        '<button onclick="submitGalleryUpload(' + isApply + ')" class="btn btn-primary">' + submitText + '</button>' +
+        '</div></div>';
+
+    document.body.appendChild(overlay);
+}
+
+// 文件预览
+function previewGalleryFile(input) {
+    const uploadArea = document.getElementById('gallery-file-upload');
+    const file = input.files[0];
+    if (!file) return;
+
+    uploadArea.classList.add('has-file');
+    const oldPreview = uploadArea.querySelector('.file-preview');
+    if (oldPreview) oldPreview.remove();
+
+    if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.className = 'file-preview';
+        img.src = URL.createObjectURL(file);
+        uploadArea.appendChild(img);
+    } else if (file.type.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.className = 'file-preview';
+        video.src = URL.createObjectURL(file);
+        video.controls = true;
+        video.muted = true;
+        video.style.maxHeight = '200px';
+        uploadArea.appendChild(video);
+    }
+
+    uploadArea.querySelector('div:first-child').textContent = '✅';
+    uploadArea.querySelector('div:nth-child(2)').textContent = file.name;
+}
+
+// 提交上传
+async function submitGalleryUpload(isApply) {
+    const title = document.getElementById('gallery-upload-title').value.trim();
+    const description = document.getElementById('gallery-upload-desc').value.trim();
+    const file = fileInput ? fileInput.files[0] : null;
+    const fileInputEl = document.getElementById('gallery-file-input');
+    const file2 = fileInputEl ? fileInputEl.files[0] : null;
+
+    if (!title) { showError('请填写标题'); return; }
+    if (!file2) { showError('请选择文件'); return; }
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('file', file2);
+
+    try {
+        const url = isApply ? (API_BASE + '/gallery/apply') : (API_BASE + '/gallery');
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: formData
+        });
+        const data = await response.json();
+        if (response.ok) {
+            showSuccessMessage(data.message || (isApply ? '申请已提交' : '上传成功'));
+            document.querySelector('.gallery-modal-overlay').remove();
+            if (!isApply) loadGalleryPage();
+        } else {
+            showError(data.error || '操作失败');
+        }
+    } catch (error) { showError('操作失败'); }
+}
+
+// 显示珍宝阁申请列表
+function displayGalleryApplications(apps) {
+    const container = document.getElementById('pending-gallery-applications');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!apps || apps.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:40px;">暂无珍宝阁上传申请</p>';
+        return;
+    }
+
+    apps.forEach(app => {
+        const item = document.createElement('div');
+        item.className = 'pending-item';
+        const userName = app.display_name || app.username || '未知用户';
+        const userAvatar = app.avatar || '/images/default-avatar.svg';
+        const time = new Date((app.created_at || '') + 'Z').toLocaleString('zh-CN');
+        const isVideo = app.file_type === 'video';
+        const mediaHtml = isVideo
+            ? '<video src="' + app.image_url + '" style="max-width:200px;max-height:150px;border-radius:8px;" controls muted></video>'
+            : '<img src="' + app.image_url + '" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover;">';
+        const statusBadge = app.status === 'pending' ? '<span style="color:#f59e0b;font-size:12px;">⏳ 待审核</span>'
+            : app.status === 'approved' ? '<span style="color:#22c55e;font-size:12px;">✅ 已通过</span>'
+            : '<span style="color:#ef4444;font-size:12px;">❌ 已拒绝</span>';
+
+        item.innerHTML = '<div class="pending-header">' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<img src="' + userAvatar + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" onerror="this.src=\'/images/default-avatar.svg\'">' +
+            '<strong>' + userName + '</strong> 申请上传' + statusBadge +
+            '</div>' +
+            '<span style="font-size:12px;color:var(--text-muted);">' + time + '</span>' +
+            '</div>' +
+            '<div style="display:flex;gap:16px;align-items:flex-start;margin:12px 0;">' +
+            '<div>' + mediaHtml + '</div>' +
+            '<div style="flex:1;">' +
+            '<div style="font-weight:600;margin-bottom:4px;">' + app.title + '</div>' +
+            (app.description ? '<div style="color:var(--text-secondary);font-size:13px;">' + app.description + '</div>' : '') +
+            '</div></div>' +
+            (app.status === 'pending' ?
+            '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+            '<button onclick="rejectGalleryApp(' + app.id + ')" class="btn btn-danger" style="padding:6px 16px;font-size:13px;">拒绝</button>' +
+            '<button onclick="approveGalleryApp(' + app.id + ')" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">通过</button>' +
+            '</div>' : '');
+
+        container.appendChild(item);
+    });
+}
+
+// 审核通过
+async function approveGalleryApp(id) {
+    try {
+        const res = await fetch(API_BASE + '/gallery/admin/applications/' + id + '/approve', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) { showSuccessMessage('已通过审核'); loadReviewPage(); }
+        else { const data = await res.json(); showError(data.error || '操作失败'); }
+    } catch (e) { showError('操作失败'); }
+}
+
+// 审核拒绝
+async function rejectGalleryApp(id) {
+    const reason = prompt('请输入拒绝原因（可选）：');
+    if (reason === null) return;
+    try {
+        const res = await fetch(API_BASE + '/gallery/admin/applications/' + id + '/reject', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason || '' })
+        });
+        if (res.ok) { showSuccessMessage('已拒绝'); loadReviewPage(); }
+        else { const data = await res.json(); showError(data.error || '操作失败'); }
+    } catch (e) { showError('操作失败'); }
 }

@@ -35,7 +35,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(fileUpload({
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB（支持视频上传）
   abortOnLimit: true,
   createParentPath: true
 }));
@@ -77,6 +77,7 @@ const commentRoutes = require('./routes/comments');
 const chatRoutes = require('./routes/chat');
 const storyRoutes = require('./routes/stories');
 const notificationRoutes = require('./routes/notifications');
+const galleryRoutes = require('./routes/gallery');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/modpacks', modpackRoutes);
@@ -87,6 +88,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/gallery', galleryRoutes);
 
 // 静态文件服务 - uploads
 const uploadsServeDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads' : path.join(__dirname, 'uploads');
