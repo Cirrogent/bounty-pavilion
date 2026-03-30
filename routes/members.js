@@ -1,5 +1,4 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { query, get, run } = require('../models/db');
@@ -7,36 +6,49 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 配置文件上传
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+// 文件上传处理函数
+const handleImageUpload = (req, fileField = 'avatar') => {
+  return new Promise((resolve, reject) => {
+    if (!req.files || !req.files[fileField]) {
+      return resolve(null);
+    }
+    
+    const file = req.files[fileField];
     const uploadDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/members' : path.join(__dirname, '..', 'uploads', 'members');
+    
+    // 确保上传目录存在
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'member-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 限制2MB
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
     
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('只允许上传图片文件（jpg, png, gif, webp）'));
+    // 检查文件类型
+    const allowedTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.name).toLowerCase();
+    
+    if (!allowedTypes.includes(ext)) {
+      return reject(new Error('只允许上传图片文件（jpg, png, gif, webp）'));
     }
-  }
-});
+    
+    // 检查文件大小（2MB）
+    if (file.size > 2 * 1024 * 1024) {
+      return reject(new Error('图片不能超过2MB'));
+    }
+    
+    // 生成文件名
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const filename = 'member-' + uniqueSuffix + ext;
+    const filepath = path.join(uploadDir, filename);
+    
+    // 移动文件
+    file.mv(filepath, (err) => {
+      if (err) {
+        return reject(err);
+      }
+      const imageUrl = `/uploads/members/${filename}`;
+      resolve(imageUrl);
+    });
+  });
+};
 
 // 获取所有成员（公开）
 router.get('/', async (req, res) => {
@@ -70,7 +82,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // 创建成员（管理员）
-router.post('/', authenticateToken, requireAdmin, upload.single('avatar'), async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, role, description, join_date } = req.body;
     
@@ -78,7 +90,8 @@ router.post('/', authenticateToken, requireAdmin, upload.single('avatar'), async
       return res.status(400).json({ error: '成员名称不能为空' });
     }
     
-    const avatar_url = req.file ? `/uploads/members/${req.file.filename}` : null;
+    // 处理图片上传
+    const avatar_url = await handleImageUpload(req, 'avatar');
     
     const result = await run(
       'INSERT INTO members (name, avatar_url, role, description, join_date) VALUES (?, ?, ?, ?, ?)',
@@ -98,7 +111,7 @@ router.post('/', authenticateToken, requireAdmin, upload.single('avatar'), async
 });
 
 // 更新成员（管理员）
-router.put('/:id', authenticateToken, requireAdmin, upload.single('avatar'), async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, role, description, join_date } = req.body;
     
@@ -114,7 +127,7 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('avatar'), asy
     let avatar_url = member.avatar_url;
     
     // 如果有新上传的图片
-    if (req.file) {
+    if (req.files && req.files.avatar) {
       // 删除旧图片
       if (member.avatar_url) {
         const oldImagePath = process.env.RAILWAY_ENVIRONMENT
@@ -124,7 +137,10 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('avatar'), asy
           fs.unlinkSync(oldImagePath);
         }
       }
-      avatar_url = `/uploads/members/${req.file.filename}`;
+      
+      // 上传新图片
+      const newImageUrl = await handleImageUpload(req, 'avatar');
+      avatar_url = newImageUrl;
     }
     
     await run(

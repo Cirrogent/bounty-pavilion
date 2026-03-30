@@ -3,6 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const fileUpload = require('express-fileupload');
 const fs = require('fs');
 
 // 加载环境变量
@@ -33,6 +34,11 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(fileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  abortOnLimit: true,
+  createParentPath: true
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 确保上传目录存在
@@ -40,7 +46,15 @@ const uploadsDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/modpacks' : p
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+const avatarsDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/avatars' : path.join(__dirname, 'uploads', 'avatars');
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
+}
 console.log(`📁 上传目录: ${uploadsDir}`);
+
+// 初始化邮件服务
+const { initTransporter } = require('./utils/email');
+const emailReady = initTransporter();
 
 // 速率限制
 const limiter = rateLimit({
@@ -61,6 +75,8 @@ const messageRoutes = require('./routes/messages');
 const adminRoutes = require('./routes/admin');
 const commentRoutes = require('./routes/comments');
 const chatRoutes = require('./routes/chat');
+const storyRoutes = require('./routes/stories');
+const notificationRoutes = require('./routes/notifications');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/modpacks', modpackRoutes);
@@ -69,6 +85,8 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/stories', storyRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 静态文件服务 - uploads
 const uploadsServeDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads' : path.join(__dirname, 'uploads');

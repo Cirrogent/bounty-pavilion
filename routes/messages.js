@@ -1,6 +1,8 @@
 const express = require('express');
 const { query, get, run } = require('../models/db');
 const { authenticateToken } = require('../middleware/auth');
+const { detectProfanity } = require('../middleware/profanityFilter');
+const { notifyNewMessage } = require('../utils/adminNotify');
 
 const router = express.Router();
 
@@ -22,8 +24,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 创建留言（需要登录）
-router.post('/', authenticateToken, async (req, res) => {
+// 创建留言（需要登录，检测违禁词）
+router.post('/', authenticateToken, detectProfanity, async (req, res) => {
   try {
     const { content } = req.body;
     
@@ -49,16 +51,19 @@ router.post('/', authenticateToken, async (req, res) => {
     
     res.status(201).json({
       message: '留言发布成功',
-      message: newMessage
+      data: newMessage
     });
+    
+    // 通知管理员有新留言（异步，不阻塞）
+    notifyNewMessage(content.trim(), req.user.username).catch(() => {});
   } catch (error) {
     console.error('发布留言失败:', error);
     res.status(500).json({ error: '发布留言失败' });
   }
 });
 
-// 回复留言（需要登录）
-router.post('/:id/reply', authenticateToken, async (req, res) => {
+// 回复留言（需要登录，检测违禁词）
+router.post('/:id/reply', authenticateToken, detectProfanity, async (req, res) => {
   try {
     const { content } = req.body;
     const parentId = req.params.id;

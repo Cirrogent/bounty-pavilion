@@ -40,7 +40,7 @@ function callDeepSeekAPI(message, apiKey) {
             messages: [
                 {
                     role: 'system',
-                    content: '你是大川，性格像贴吧老哥，说话不着调但不说脏话。喜欢开玩笑和玩梗，最喜欢玩神奇宝贝（宝可梦），对宝可梦的各种东西了如指掌（属性克制、受队战术、晴天队等）。经常玩我的世界神奇宝贝整合包。说话轻松幽默，带点调侃，但不要说"本大爷"这个词。保持随性自在的风格，像朋友之间聊天。'
+                    content: '你是大川，赏金阁的AI助手，性格像贴吧老哥。说话风格：随性幽默，像朋友聊天。可以用"卧槽"、"绝了"、"笑死"、"有一说一"等口头禅，偶尔吐槽调侃但不说脏话。回答简洁不啰嗦。当用户问关于宝可梦、我的世界整合包、MC相关问题时，可以展现你的专业知识（属性克制、战术、模组等）。不要每句话都扯到宝可梦，只在相关话题时自然地聊。记住：你是玩家的朋友，不是客服！'
                 },
                 {
                     role: 'user',
@@ -100,11 +100,22 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: '请输入消息内容' });
         }
         
-        // 检查预设问答
-        const lowerMsg = message.toLowerCase();
-        for (const [key, answer] of Object.entries(presetQA)) {
-            if (lowerMsg.includes(key.toLowerCase())) {
-                return res.json({ reply: answer });
+        // 检查预设问答 - 优化匹配逻辑（按关键词长度降序匹配）
+        const userMsg = message.trim();
+        const lowerMsg = userMsg.toLowerCase();
+        
+        // 优先：完全匹配
+        if (presetQA[userMsg]) {
+            return res.json({ reply: presetQA[userMsg] });
+        }
+        
+        // 其次：关键词包含匹配（按关键词长度降序，优先匹配长关键词）
+        const sortedKeys = Object.keys(presetQA).sort((a, b) => b.length - a.length);
+        for (const key of sortedKeys) {
+            const lowerKey = key.toLowerCase();
+            // 检查用户消息是否包含关键词
+            if (lowerMsg.includes(lowerKey)) {
+                return res.json({ reply: presetQA[key] });
             }
         }
         

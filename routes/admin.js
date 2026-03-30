@@ -1,6 +1,9 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const { query, get, run } = require('../models/db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { createNotification } = require('./notifications');
 
 const router = express.Router();
 
@@ -93,71 +96,7 @@ router.delete('/users/:userId', authenticateToken, requireAdmin, async (req, res
   }
 });
 
-// 获取待处理的修改申请（管理员）
-router.get('/modpack-requests', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const requests = await query(`
-      SELECT mr.*, m.name as modpack_name, u.username as requester_name
-      FROM modpack_requests mr
-      JOIN modpacks m ON mr.modpack_id = m.id
-      JOIN users u ON mr.user_id = u.id
-      WHERE mr.status = 'pending'
-      ORDER BY mr.created_at DESC
-    `);
-    
-    res.json(requests);
-  } catch (error) {
-    console.error('获取修改申请失败:', error);
-    res.status(500).json({ error: '获取修改申请失败' });
-  }
-});
-
-// 处理修改申请（管理员）
-router.put('/modpack-requests/:requestId', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { action } = req.body;
-    const requestId = req.params.requestId;
-    
-    if (!['approve', 'reject'].includes(action)) {
-      return res.status(400).json({ error: '无效的操作' });
-    }
-    
-    const request = await get('SELECT * FROM modpack_requests WHERE id = ?', [requestId]);
-    if (!request) {
-      return res.status(404).json({ error: '申请不存在' });
-    }
-    
-    if (request.status !== 'pending') {
-      return res.status(400).json({ error: '该申请已处理过' });
-    }
-    
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
-    
-    await run(
-      'UPDATE modpack_requests SET status = ? WHERE id = ?',
-      [newStatus, requestId]
-    );
-    
-    // 如果批准，应用修改
-    if (action === 'approve') {
-      const modpackData = JSON.parse(request.data);
-      await run(
-        'UPDATE modpacks SET name = ?, description = ?, download_link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [modpackData.name, modpackData.description, modpackData.download_link, request.modpack_id]
-      );
-    }
-    
-    res.json({
-      message: action === 'approve' ? '申请已批准，修改已应用' : '申请已拒绝',
-      requestId
-    });
-  } catch (error) {
-    console.error('处理修改申请失败:', error);
-    res.status(500).json({ error: '处理修改申请失败' });
-  }
-});
-
-// 获取网站统计信息（管理员）
+module.exports = router;
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const stats = {};
@@ -237,6 +176,18 @@ router.put('/pending-modpacks/:id/approve', authenticateToken, requireAdmin, asy
       ['published', req.params.id]
     );
     
+    // 通知整合包作者
+    if (modpack.author_id) {
+      await createNotification(
+        modpack.author_id,
+        'modpack_approved',
+        '整合包审核通过',
+        `你提交的整合包「${modpack.name}」已通过审核，现已发布！`,
+        modpack.id,
+        'modpack'
+      );
+    }
+    
     res.json({
       message: '整合包已批准发布',
       modpackId: req.params.id
@@ -264,6 +215,18 @@ router.put('/pending-modpacks/:id/reject', authenticateToken, requireAdmin, asyn
       }
     }
     
+    // 通知整合包作者
+    if (modpack.author_id) {
+      await createNotification(
+        modpack.author_id,
+        'modpack_rejected',
+        '整合包审核未通过',
+        `你提交的整合包「${modpack.name}」未通过审核，请修改后重新提交。`,
+        modpack.id,
+        'modpack'
+      );
+    }
+    
     await run('DELETE FROM modpacks WHERE id = ?', [req.params.id]);
     
     res.json({
@@ -273,6 +236,95 @@ router.put('/pending-modpacks/:id/reject', authenticateToken, requireAdmin, asyn
   } catch (error) {
     console.error('拒绝整合包失败:', error);
     res.status(500).json({ error: '拒绝整合包失败' });
+  }
+});
+
+// 禁言用户（管理员）
+router.post('/users/:userId/ban', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { days } = req.body;
+    const targetUserId = req.params.userId;
+    const banDays = parseInt(days) || 7;
+    
+    if (banDays < 1 || banDays > 365) {
+      return res.status(400).json({ error: '禁言天数必须在1-365天之间' });
+    }
+    
+    // 不能禁言自己
+    if (targetUserId == req.user.id) {
+      return res.status(400).json({ error: '不能禁言自己' });
+    }
+    
+    const targetUser = await get('SELECT * FROM users WHERE id = ?', [targetUserId]);
+    if (!targetUser) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    // 不能禁言超级管理员
+    if (targetUser.username === 'admin') {
+      return res.status(400).json({ error: '不能禁言超级管理员' });
+    }
+    
+    const bannedUntil = new Date();
+    bannedUntil.setDate(bannedUntil.getDate() + banDays);
+    
+    await run(
+      'UPDATE users SET banned_until = ? WHERE id = ?',
+      [bannedUntil.toISOString(), targetUserId]
+    );
+    
+    res.json({
+      message: `用户 ${targetUser.username} 已被禁言 ${banDays} 天`,
+      banned_until: bannedUntil
+    });
+  } catch (error) {
+    console.error('禁言用户失败:', error);
+    res.status(500).json({ error: '禁言用户失败' });
+  }
+});
+
+// 解除禁言（管理员）
+router.post('/users/:userId/unban', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+    
+    const targetUser = await get('SELECT * FROM users WHERE id = ?', [targetUserId]);
+    if (!targetUser) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    await run(
+      'UPDATE users SET banned_until = NULL WHERE id = ?',
+      [targetUserId]
+    );
+    
+    res.json({
+      message: `用户 ${targetUser.username} 的禁言已解除`
+    });
+  } catch (error) {
+    console.error('解除禁言失败:', error);
+    res.status(500).json({ error: '解除禁言失败' });
+  }
+});
+
+// 获取网站统计信息（管理员）
+router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const stats = {};
+    const userStats = await get(`SELECT COUNT(*) as total_users, COUNT(CASE WHEN role = 'admin' THEN 1 END) as admin_count, COUNT(CASE WHEN role = 'user' THEN 1 END) as user_count FROM users`);
+    stats.users = userStats;
+    const modpackStats = await get(`SELECT COUNT(*) as total_modpacks, SUM(views) as total_views, SUM(downloads) as total_downloads FROM modpacks`);
+    stats.modpacks = modpackStats;
+    const messageStats = await get('SELECT COUNT(*) as total_messages FROM messages WHERE parent_id IS NULL');
+    stats.messages = messageStats;
+    const memberStats = await get('SELECT COUNT(*) as total_members FROM members');
+    stats.members = memberStats;
+    const pendingRequests = await get('SELECT COUNT(*) as pending_requests FROM modpack_requests WHERE status = "pending"');
+    stats.pendingRequests = pendingRequests.pending_requests;
+    res.json(stats);
+  } catch (error) {
+    console.error('获取统计信息失败:', error);
+    res.status(500).json({ error: '获取统计信息失败' });
   }
 });
 

@@ -35,6 +35,10 @@ async function init() {
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'user',
     avatar VARCHAR(255),
+    avatar_required BOOLEAN DEFAULT 0,
+    email_verified BOOLEAN DEFAULT 0,
+    verification_code VARCHAR(10),
+    banned_until DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
@@ -90,11 +94,99 @@ async function init() {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     modpack_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    parent_id INTEGER DEFAULT NULL,
     content TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modpack_id) REFERENCES modpacks(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_id) REFERENCES modpack_comments(id)
   )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_modpack_comments_parent ON modpack_comments(parent_id)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS stories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    image_url VARCHAR(255),
+    author_id INTEGER NOT NULL,
+    category VARCHAR(20) DEFAULT 'gossip',
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    heat INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'published',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+  )`);
+  
+  // 更新已有文章的热度字段（兼容旧数据库）
+  try { db.run(`ALTER TABLE stories ADD COLUMN heat INTEGER DEFAULT 0`); } catch(e) {}
+  
+  // 创建触发器：评论时增加热度（+1）
+  try {
+    db.run(`CREATE TRIGGER IF NOT EXISTS update_story_heat_on_comment
+    AFTER INSERT ON story_comments
+    FOR EACH ROW
+    BEGIN
+      UPDATE stories SET heat = heat + 1 WHERE id = NEW.story_id;
+    END`);
+  } catch(e) { console.log('评论触发器已存在或创建失败:', e.message); }
+  
+  // 创建触发器：点赞时增加热度（+2）
+  try {
+    db.run(`CREATE TRIGGER IF NOT EXISTS update_story_heat_on_like
+    AFTER UPDATE ON stories
+    FOR EACH ROW
+    WHEN NEW.likes > OLD.likes
+    BEGIN
+      UPDATE stories SET heat = heat + 2 WHERE id = NEW.id;
+    END`);
+  } catch(e) { console.log('点赞触发器已存在或创建失败:', e.message); }
+
+  db.run(`CREATE TABLE IF NOT EXISTS story_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    parent_id INTEGER DEFAULT NULL,
+    content TEXT NOT NULL,
+    image_url VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (story_id) REFERENCES stories(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_id) REFERENCES story_comments(id)
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_story_comments_parent ON story_comments(parent_id)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS temp_registrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    verification_code VARCHAR(10) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    related_id INTEGER,
+    related_type VARCHAR(20),
+    sender_id INTEGER,
+    is_read BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)`);
+
+  // 兼容旧数据库：确保字段存在
+  try { db.run(`ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 0`); } catch(e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN verification_code VARCHAR(10)`); } catch(e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN avatar VARCHAR(255)`); } catch(e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN banned_until DATETIME`); } catch(e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN display_name VARCHAR(50)`); } catch(e) {}
+  try { db.run(`ALTER TABLE notifications ADD COLUMN sender_id INTEGER`); } catch(e) {}
 
   // 保存数据库到文件
   saveDb();

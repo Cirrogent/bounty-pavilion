@@ -7,11 +7,6 @@
     <link rel="stylesheet" href="/css/style.css?ver=2.0.0">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/images/logo.png" type="image/png">
-    
-    <!-- 背景音乐 -->
-    <audio id="background-music" loop>
-        <source src="/music/background.mp3" type="audio/mpeg">
-    </audio>
     <style>
         /* 强制多列网格布局 - 覆盖所有可能的外部CSS */
         .modpacks-grid {
@@ -64,10 +59,31 @@
             </div>
             <ul class="nav-menu">
                 <li><a href="#" data-page="home" class="nav-link">首页</a></li>
+                <li><a href="#" data-page="stories" class="nav-link">野史趣事</a></li>
                 <li><a href="#" data-page="members" class="nav-link">成员</a></li>
                 <li><a href="#" data-page="messages" class="nav-link">留言板</a></li>
+                <li class="theme-switcher">
+                    <button onclick="toggleTheme()" class="theme-btn" title="切换主题">
+                        <img id="theme-icon" src="/images/slimeball.png" alt="主题" style="width: 24px; height: 24px;">
+                    </button>
+                </li>
                 <li id="user-menu">
                     <a href="#" data-page="login" class="nav-link" id="login-link">登录</a>
+                </li>
+                <li id="notification-bell" style="display: none; position: relative;">
+                    <a href="#" onclick="showNotifications(event)" class="nav-link" style="padding: 10px 12px;">
+                        🔔
+                        <span id="notification-badge" style="position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: none; align-items: center; justify-content: center;"></span>
+                    </a>
+                    <div id="notification-dropdown" style="display: none; position: absolute; top: 50px; right: 0; background: var(--secondary-color); border: 2px solid var(--border-color); border-radius: 10px; width: 320px; max-height: 400px; overflow-y: auto; box-shadow: var(--shadow-lg); z-index: 2000;">
+                        <div style="padding: 15px; border-bottom: 2px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="color: var(--text-accent); margin: 0;">通知</h4>
+                            <a href="#" onclick="markAllNotificationsRead(event)" style="color: var(--text-accent); font-size: 13px;">全部已读</a>
+                        </div>
+                        <div id="notification-list" style="padding: 10px;">
+                            <p style="text-align: center; color: var(--text-secondary); padding: 20px;">暂无通知</p>
+                        </div>
+                    </div>
                 </li>
             </ul>
         </div>
@@ -77,6 +93,9 @@
     <main class="container">
         <!-- 首页 -->
         <div id="home-page" class="page active">
+            <!-- 粒子背景画布 -->
+            <canvas id="particle-canvas" class="particle-canvas"></canvas>
+            
             <div class="page-header">
             <h2><img src="/images/logo.png" alt="工作台" style="width: 28px; height: 28px; vertical-align: middle; margin-right: 8px;"> Minecraft 整合包</h2>
             <button id="add-modpack-btn" class="btn btn-primary" style="display: none;">+ 新增整合包</button>
@@ -126,40 +145,92 @@
                 <div class="auth-tabs">
                     <button class="tab-btn active" data-tab="login">登录</button>
                     <button class="tab-btn" data-tab="register">注册</button>
+                    <button class="tab-btn" data-tab="forgot">忘记密码</button>
                 </div>
                 
                 <!-- 登录表单 -->
                 <div id="login-form-container" class="tab-content active">
                     <form id="login-form">
                         <div class="form-group">
-                            <label for="login-username">用户名</label>
-                            <input type="text" id="login-username" class="form-control" required>
+                            <label for="login-username">用户名 / 邮箱</label>
+                            <input type="text" id="login-username" class="form-control" required placeholder="输入用户名或邮箱">
                         </div>
                         <div class="form-group">
                             <label for="login-password">密码</label>
                             <input type="password" id="login-password" class="form-control" required>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">登录</button>
+                        <p style="text-align: center; margin-top: 12px;">
+                            <a href="#" onclick="switchTab('forgot'); return false;" style="color: var(--text-accent); font-size: 13px; text-decoration: none;">忘记密码？</a>
+                        </p>
                     </form>
                 </div>
 
                 <!-- 注册表单 -->
                 <div id="register-form-container" class="tab-content">
-                    <form id="register-form">
-                        <div class="form-group">
-                            <label for="register-username">用户名</label>
-                            <input type="text" id="register-username" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="register-email">邮箱</label>
-                            <input type="email" id="register-email" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="register-password">密码</label>
-                            <input type="password" id="register-password" class="form-control" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-block">注册</button>
-                    </form>
+                    <div id="register-step1">
+                        <form id="register-form-step1">
+                            <div class="form-group">
+                                <label for="register-username">名称</label>
+                                <input type="text" id="register-username" class="form-control" required maxlength="20" placeholder="支持中文，1-20个字符">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-account">账号</label>
+                                <input type="text" id="register-account" class="form-control" required minlength="3" maxlength="20" placeholder="用于登录的账号">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-password">密码</label>
+                                <input type="password" id="register-password" class="form-control" required minlength="6" placeholder="至少6位">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-confirm-password">确认密码</label>
+                                <input type="password" id="register-confirm-password" class="form-control" required minlength="6" placeholder="请再次输入密码">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-email">邮箱</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="email" id="register-email" class="form-control" required placeholder="请输入邮箱地址" style="flex: 1;">
+                                    <button type="button" id="send-code-btn" class="btn btn-primary" onclick="handleSendCode()" style="white-space: nowrap; min-width: 120px;">发送验证码</button>
+                                </div>
+                            </div>
+                            <div class="form-group" id="code-group" style="display: none;">
+                                <label for="register-code">验证码</label>
+                                <input type="text" id="register-code" class="form-control" maxlength="6" placeholder="请输入6位验证码" style="letter-spacing: 4px; font-size: 18px; text-align: center;">
+                                <small id="code-validity-hint" style="color: var(--text-secondary);">验证码已发送到你的邮箱，<span id="code-remain-time">3:00</span> 内有效</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">注册</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 忘记密码表单 -->
+                <div id="forgot-form-container" class="tab-content">
+                    <div id="forgot-step1">
+                        <h3 style="margin-bottom: 16px; text-align: center; color: var(--text-primary);">🔑 找回密码</h3>
+                        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; text-align: center;">输入你的注册邮箱，我们将发送验证码帮你重置密码。</p>
+                        <form id="forgot-form-step1">
+                            <div class="form-group">
+                                <label for="forgot-email">邮箱地址</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="email" id="forgot-email" class="form-control" required placeholder="请输入注册时的邮箱" style="flex: 1;">
+                                    <button type="button" id="forgot-send-code-btn" class="btn btn-primary" onclick="handleForgotSendCode()" style="white-space: nowrap; min-width: 120px;">发送验证码</button>
+                                </div>
+                            </div>
+                            <div class="form-group" id="forgot-code-group" style="display: none;">
+                                <label for="forgot-code">验证码</label>
+                                <input type="text" id="forgot-code" class="form-control" maxlength="6" placeholder="请输入6位验证码" style="letter-spacing: 4px; font-size: 18px; text-align: center;">
+                                <small id="forgot-code-validity-hint" style="color: var(--text-secondary);">验证码已发送到你的邮箱，<span id="forgot-code-remain-time">3:00</span> 内有效</small>
+                            </div>
+                            <div class="form-group" id="forgot-password-group" style="display: none;">
+                                <label for="forgot-new-password">新密码</label>
+                                <input type="password" id="forgot-new-password" class="form-control" required minlength="6" placeholder="至少6位新密码">
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block" id="forgot-reset-btn" style="display: none;">重置密码</button>
+                        </form>
+                        <p style="text-align: center; margin-top: 16px;">
+                            <a href="#" onclick="switchTab('login'); return false;" style="color: var(--text-accent); font-size: 13px; text-decoration: none;">← 返回登录</a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -169,9 +240,22 @@
             <div class="profile-container">
                 <h2>个人中心</h2>
                 <div class="profile-info">
-                    <p><strong>用户名:</strong> <span id="profile-username"></span></p>
-                    <p><strong>邮箱:</strong> <span id="profile-email"></span></p>
-                    <p><strong>角色:</strong> <span id="profile-role"></span></p>
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+                        <div style="position: relative; cursor: pointer;" onclick="document.getElementById('avatar-input').click()" title="点击更换头像">
+                            <img id="profile-avatar" src="/images/default-avatar.svg" alt="头像" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--primary-color); object-fit: cover;">
+                            <div style="position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; border: 2px solid var(--bg-primary);">📷</div>
+                        </div>
+                        <input type="file" id="avatar-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;" onchange="handleAvatarUpload(event)">
+                        <div>
+                            <p style="font-size: 18px; font-weight: bold; color: #fff;" id="profile-username"></p>
+                            <p style="color: var(--text-secondary);" id="profile-email-display">
+                                <span id="profile-email"></span>
+                                <span id="email-verified-badge" style="display: none; color: #4ade80; font-size: 12px; margin-left: 8px;">✓ 已验证</span>
+                                <span id="email-unverified-badge" style="display: none; color: #f87171; font-size: 12px; margin-left: 8px; cursor: pointer;" onclick="handleSendVerifyEmail()" title="点击重新验证">✗ 未验证（点击验证）</span>
+                            </p>
+                            <p><strong>角色:</strong> <span id="profile-role"></span></p>
+                        </div>
+                    </div>
                 </div>
                 
                 <h3>修改密码</h3>
@@ -191,6 +275,68 @@
             </div>
         </div>
 
+        <!-- 野史趣事页面 -->
+        <div id="stories-page" class="page">
+            <div class="page-header">
+                <h2>📜 野史趣事</h2>
+                <button id="add-story-btn" class="btn btn-primary" style="display: none;">+ 发布趣事</button>
+            </div>
+            
+            <!-- 筛选器 -->
+            <div class="story-filters" style="margin-bottom: 20px; padding: 0;">
+                <div style="display: flex; gap: 24px; align-items: flex-end; justify-content: center; flex-wrap: wrap;">
+                    <!-- 分类筛选 -->
+                    <div class="filter-group" style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <label style="margin-bottom: 8px; font-weight: 500; color: var(--text-primary); font-size: 14px;">分类</label>
+                        <select id="story-category" onchange="onStoryFilterChange()" style="padding: 10px 16px; background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; min-width: 120px;">
+                            <option value="all">全部</option>
+                            <option value="gossip">八卦趣事</option>
+                            <option value="novel">野史小说</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 排序方式 -->
+                    <div class="filter-group" style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <label style="margin-bottom: 8px; font-weight: 500; color: var(--text-primary); font-size: 14px;">排序</label>
+                        <select id="story-sort" onchange="onStoryFilterChange()" style="padding: 10px 16px; background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; min-width: 120px;">
+                            <option value="latest">最新发布</option>
+                            <option value="hot">最热门</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 搜索框 -->
+                    <div class="filter-group" style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 250px; max-width: 400px;">
+                        <label style="margin-bottom: 8px; font-weight: 500; color: var(--text-primary); font-size: 14px;">搜索</label>
+                        <div style="display: flex; gap: 8px; width: 100%;">
+                            <input type="text" id="story-search" placeholder="搜索标题或作者..." 
+                                   style="flex: 1; padding: 10px 16px; background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px;"
+                                   onkeypress="if(event.key==='Enter') onStorySearch()">
+                            <button class="btn btn-primary" onclick="onStorySearch()" style="padding: 10px 20px; white-space: nowrap; font-size: 14px;">搜索</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="stories-list" class="stories-list">
+                <!-- 动态加载野史趣事 -->
+            </div>
+        </div>
+        
+        <!-- 背景音乐 -->
+        <audio id="bg-music" loop>
+            <source src="/music/background.mp3" type="audio/mpeg">
+        </audio>
+        
+        <!-- 音乐控制按钮 -->
+        <button id="music-control-btn" class="music-control-btn rotating">
+            <img src="/uploads/music-icon.jpg" alt="音乐" onerror="this.src='/images/default-music.png'">
+        </button>
+
+        <!-- 野史趣事详情页面 -->
+        <div id="story-detail-page" class="page">
+            <!-- 动态加载文章详情 -->
+        </div>
+
         <!-- 审核页面（管理员） -->
         <div id="review-page" class="page">
             <div class="page-header">
@@ -205,6 +351,15 @@
             </div>
         </div>
     </main>
+
+    <!-- 居中弹窗提示（成功/错误/警告） -->
+    <div id="success-toast" class="success-toast">
+        <div class="success-content">
+            <div class="success-icon" id="toast-icon">✓</div>
+            <div class="success-message" id="success-message"></div>
+            <button class="toast-close-btn" onclick="hideSuccessMessage()">确 定</button>
+        </div>
+    </div>
 
     <!-- 模态框（用于编辑和新增） -->
     <div id="modal" class="modal">
@@ -242,7 +397,10 @@
                 <h4 class="comments-title">💬 评论</h4>
                 
                 <div class="comment-form" id="comment-form">
-                    <textarea id="comment-input" class="comment-textarea" placeholder="写下你的评论..." rows="3"></textarea>
+                    <div style="position: relative;">
+                        <textarea id="comment-input" class="comment-textarea" placeholder="写下你的评论..." rows="3"></textarea>
+                        <button type="button" id="emoji-btn" class="emoji-btn" title="插入表情">😊</button>
+                    </div>
                     <button class="btn btn-primary" id="comment-submit-btn">发表评论</button>
                 </div>
                 
@@ -286,12 +444,64 @@
         </div>
     </div>
 
+    <!-- Emoji浮窗选择器 -->
+    <div id="emoji-picker" class="emoji-floating-picker" style="display: none;">
+        <div class="emoji-grid" id="emoji-grid">
+            <!-- Emoji将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
     <!-- 页脚 -->
     <footer class="footer">
-        <p>&copy; 2026 赏金阁 - Minecraft 整合包分享社区 | 机魂出品</p>
+        <p>&copy; 2026 赏金阁 - Minecraft 整合包分享社区 | 机魂出品 - <a href="#" onclick="showDisclaimer()" style="color: var(--text-accent); text-decoration: none;">免责条款</a></p>
     </footer>
+
+    <!-- 免责条款模态框 -->
+    <div id="disclaimer-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>免责条款</h3>
+                <button class="modal-close" onclick="hideDisclaimer()">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <h4>使用条款</h4>
+                <p>欢迎使用赏金阁（Bounty Pavilion）Minecraft整合包分享平台。以下条款适用于所有访问和使用本网站的用户。</p>
+                
+                <h4>内容免责声明</h4>
+                <p>1. 本网站上的所有整合包、模组、资源包等内容均由社区成员上传和分享，不代表本站立场。</p>
+                <p>2. 我们对用户上传内容的真实性、准确性、完整性、合法性不做任何保证。</p>
+                <p>3. 使用本站提供的任何整合包、模组等资源所造成的任何直接或间接损失，本站不承担任何责任。</p>
+                
+                <h4>用户责任</h4>
+                <p>1. 用户应自行判断和承担使用本站资源的风险。</p>
+                <p>2. 用户应遵守相关法律法规，不得上传、分享任何违法或侵权内容。</p>
+                <p>3. 用户上传的内容应确保不侵犯第三方的知识产权或其他合法权益。</p>
+                
+                <h4>知识产权</h4>
+                <p>1. 用户上传的内容的知识产权归原作者所有。</p>
+                <p>2. 本站仅提供信息存储空间和分享平台服务。</p>
+                
+                <h4>服务变更</h4>
+                <p>1. 本站有权随时修改、暂停或终止服务，恕不另行通知。</p>
+                <p>2. 对于因服务变更造成的任何损失，本站不承担任何责任。</p>
+                
+                <h4>法律适用</h4>
+                <p>1. 本条款适用中华人民共和国法律。</p>
+                <p>2. 如发生争议，双方应友好协商解决；协商不成的，提交本站所在地人民法院管辖。</p>
+                
+                <p style="margin-top: 20px; font-weight: bold;">使用本站即表示您同意以上条款。如有疑问，请与我们联系。</p>
+            </div>
+        </div>
+    </div>
 
     <!-- 加载JavaScript -->
     <script src="/js/app.js?v=202603241721"></script>
+
+    <!-- 右侧浮动按钮（仅在文章详情页显示） -->
+    <div id="floating-buttons" class="floating-buttons" style="display: none;">
+        <button id="scroll-to-top-btn" class="floating-btn" title="返回顶部">⬆️</button>
+        <button id="scroll-to-comments-btn" class="floating-btn" title="前往评论">💬</button>
+        <button id="back-to-position-btn" class="floating-btn" title="返回刚才位置">↩️</button>
+    </div>
 </body>
 </html>

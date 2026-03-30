@@ -17,10 +17,25 @@ function authenticateToken(req, res, next) {
       return res.status(403).json({ error: '登录已过期，请重新登录' });
     }
 
-    // 从数据库获取完整用户信息
-    const dbUser = await get('SELECT id, username, email, role, avatar FROM users WHERE id = ?', [user.userId]);
+    // 从数据库获取完整用户信息（包含禁言状态）
+    const dbUser = await get('SELECT id, username, display_name, email, role, avatar, banned_until FROM users WHERE id = ?', [user.userId]);
     if (!dbUser) {
       return res.status(404).json({ error: '用户不存在' });
+    }
+
+    // 检查禁言状态
+    if (dbUser.banned_until) {
+      const bannedUntil = new Date(dbUser.banned_until);
+      if (new Date() < bannedUntil) {
+        const remainingDays = Math.ceil((bannedUntil - new Date()) / (1000 * 60 * 60 * 24));
+        return res.status(403).json({ 
+          error: `您已被禁言，还剩${remainingDays}天`,
+          banned_until: dbUser.banned_until
+        });
+      }
+      // 禁言已过期，自动解除
+      const { run } = require('../models/db');
+      run('UPDATE users SET banned_until = NULL WHERE id = ?', [dbUser.id]);
     }
 
     req.user = dbUser;

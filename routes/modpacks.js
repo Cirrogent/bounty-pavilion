@@ -1,46 +1,60 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { query, get, run } = require('../models/db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { notifyNewModpack } = require('../utils/adminNotify');
 
 const router = express.Router();
 
-// 配置文件上传
+// 配置文件上传目录
 const getUploadDir = () => {
   return process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/modpacks' : path.join(__dirname, '..', 'uploads', 'modpacks');
 };
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+// 文件上传处理函数
+const handleImageUpload = (req, fileField = 'image') => {
+  return new Promise((resolve, reject) => {
+    if (!req.files || !req.files[fileField]) {
+      return resolve(null);
+    }
+    
+    const file = req.files[fileField];
     const uploadDir = getUploadDir();
+    
+    // 确保上传目录存在
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'modpack-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 限制5MB
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
     
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('只允许上传图片文件（jpg, png, gif, webp）'));
+    // 检查文件类型
+    const allowedTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.name).toLowerCase();
+    
+    if (!allowedTypes.includes(ext)) {
+      return reject(new Error('只支持jpg、png、gif、webp格式'));
     }
-  }
-});
+    
+    // 检查文件大小（5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      return reject(new Error('图片不能超过5MB'));
+    }
+    
+    // 生成文件名
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const filename = 'modpack-' + uniqueSuffix + ext;
+    const filepath = path.join(uploadDir, filename);
+    
+    // 移动文件
+    file.mv(filepath, (err) => {
+      if (err) {
+        return reject(err);
+      }
+      const imageUrl = `/uploads/modpacks/${filename}`;
+      resolve(imageUrl);
+    });
+  });
+};
 
 // 获取所有整合包（公开）- 只显示已发布的
 router.get('/', async (req, res) => {
@@ -85,7 +99,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // 创建整合包（管理员）
-router.post('/', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, description, download_link } = req.body;
     
@@ -93,7 +107,8 @@ router.post('/', authenticateToken, requireAdmin, upload.single('image'), async 
       return res.status(400).json({ error: '请填写完整的整合包信息' });
     }
     
-    const image_url = req.file ? `/uploads/modpacks/${req.file.filename}` : null;
+    // 处理图片上传
+    const image_url = await handleImageUpload(req, 'image');
     
     const result = await run(
       'INSERT INTO modpacks (name, description, image_url, download_link, author_id, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -113,7 +128,7 @@ router.post('/', authenticateToken, requireAdmin, upload.single('image'), async 
 });
 
 // 提交待审核整合包（普通用户）
-router.post('/pending', authenticateToken, upload.single('image'), async (req, res) => {
+router.post('/pending', authenticateToken, async (req, res) => {
   try {
     const { name, description, download_link } = req.body;
     
@@ -121,7 +136,8 @@ router.post('/pending', authenticateToken, upload.single('image'), async (req, r
       return res.status(400).json({ error: '请填写完整的整合包信息' });
     }
     
-    const image_url = req.file ? `/uploads/modpacks/${req.file.filename}` : null;
+    // 处理图片上传
+    const image_url = await handleImageUpload(req, 'image');
     
     const result = await run(
       'INSERT INTO modpacks (name, description, image_url, download_link, author_id, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -129,6 +145,9 @@ router.post('/pending', authenticateToken, upload.single('image'), async (req, r
     );
     
     const newModpack = await get('SELECT * FROM modpacks WHERE id = ?', [result.id]);
+    
+    // 通知管理员有新整合包待审核
+    notifyNewModpack(name, req.user.username).catch(() => {});
     
     res.status(201).json({
       message: '整合包已提交，等待管理员审核',
@@ -141,7 +160,7 @@ router.post('/pending', authenticateToken, upload.single('image'), async (req, r
 });
 
 // 更新整合包（管理员）
-router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, description, download_link } = req.body;
     
@@ -157,7 +176,7 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), asyn
     let image_url = modpack.image_url;
     
     // 如果有新上传的图片
-    if (req.file) {
+    if (req.files && req.files.image) {
       // 删除旧图片
       if (modpack.image_url) {
         const oldImagePath = process.env.RAILWAY_ENVIRONMENT
@@ -167,7 +186,10 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), asyn
           fs.unlinkSync(oldImagePath);
         }
       }
-      image_url = `/uploads/modpacks/${req.file.filename}`;
+      
+      // 处理新图片上传
+      const newImageUrl = await handleImageUpload(req, 'image');
+      image_url = newImageUrl;
     }
     
     await run(
