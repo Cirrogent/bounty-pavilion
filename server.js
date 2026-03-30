@@ -22,6 +22,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const app = express();
+app.set('trust proxy', 1);  // 信任代理（Nginx）的 X-Forwarded-For 头
 const PORT = process.env.PORT || 3000;
 
 // 中间件
