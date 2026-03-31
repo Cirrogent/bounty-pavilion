@@ -40,7 +40,20 @@ app.use(fileUpload({
   abortOnLimit: true,
   createParentPath: true
 }));
-app.use(express.static(path.join(__dirname, 'public')));
+// 静态文件服务（带缓存优化）
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d', // 静态资源缓存1天
+  setHeaders: (res, path) => {
+    // 图片文件缓存30天
+    if (path.match(/\.(jpg|jpeg|png|gif|svg|ico|webp)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=2592000'); // 30天
+    }
+    // CSS/JS缓存7天
+    if (path.match(/\.(css|js)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // 7天
+    }
+  }
+}));
 
 // API响应禁用缓存，确保数据实时性
 app.use('/api', (req, res, next) => {

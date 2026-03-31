@@ -244,7 +244,7 @@ function createModpackCard(modpack) {
             </div>
         ` : ''}
         ${modpack.image_url ? `
-            <img src="${modpack.image_url}" alt="${modpack.name}" class="modpack-image">
+            <img src="${modpack.image_url}" alt="${modpack.name}" class="modpack-image" loading="lazy">
         ` : `
             <div class="modpack-image" style="background-color: var(--primary-color); display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">暂无图片</div>
         `}
@@ -321,7 +321,7 @@ function createMemberCard(member) {
             </div>
         ` : ''}
         ${member.avatar_url ? `
-            <img src="${member.avatar_url}" alt="${member.name}" class="member-avatar">
+            <img src="${member.avatar_url}" alt="${member.name}" class="member-avatar" loading="lazy">
         ` : `
             <div class="member-avatar" style="background-color: var(--primary-color); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 36px;">?</div>
         `}

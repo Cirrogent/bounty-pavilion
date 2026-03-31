@@ -65,7 +65,7 @@
                 <li><a href="#" data-page="messages" class="nav-link">留言板</a></li>
                 <li class="theme-switcher">
                     <button onclick="toggleTheme()" class="theme-btn" title="切换主题">
-                        <img id="theme-icon" src="/images/slimeball.png" alt="主题" style="width: 24px; height: 24px;">
+                        <img id="theme-icon" src="/images/slimeball.png" alt="主题" style="width: 24px; height: 24px;" loading="lazy">
                     </button>
                 </li>
                 <li id="user-menu">
@@ -246,7 +246,7 @@
                 <div class="profile-info">
                     <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
                         <div style="position: relative; cursor: pointer;" onclick="document.getElementById('avatar-input').click()" title="点击更换头像">
-                            <img id="profile-avatar" src="/images/default-avatar.svg" alt="头像" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--primary-color); object-fit: cover;">
+                            <img id="profile-avatar" src="/images/default-avatar.svg" alt="头像" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--primary-color); object-fit: cover;" loading="lazy">
                             <div style="position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; border: 2px solid var(--bg-primary);">📷</div>
                         </div>
                         <input type="file" id="avatar-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;" onchange="handleAvatarUpload(event)">
@@ -333,7 +333,7 @@
         
         <!-- 音乐控制按钮 -->
         <button id="music-control-btn" class="music-control-btn rotating">
-            <img src="/uploads/music-icon.jpg" alt="音乐" onerror="this.src='/images/default-music.png'">
+            <img src="/uploads/music-icon.jpg" alt="音乐" onerror="this.src='/images/default-music.png'" loading="lazy">
         </button>
 
         <!-- 野史趣事详情页面 -->
@@ -344,7 +344,7 @@
         <!-- 珍宝阁页面 -->
         <div id="gallery-page" class="page">
             <div class="page-header">
-                <h2><img src="/images/huakuang-zuanshi.jpg" alt="💎" style="width: 36px; height: 36px; vertical-align: middle; margin-right: 8px; border-radius: 4px;"> 珍宝阁</h2>
+                <h2><img src="/images/huakuang-zuanshi.jpg" alt="💎" style="width: 36px; height: 36px; vertical-align: middle; margin-right: 8px; border-radius: 4px;" loading="lazy"> 珍宝阁</h2>
                 <div style="display: flex; gap: 10px;">
                     <button id="gallery-apply-btn" class="btn btn-secondary" style="display: none;">📤 申请上传</button>
                     <button id="gallery-upload-btn" class="btn btn-primary" style="display: none;">📷 上传</button>
@@ -448,7 +448,7 @@
     <div class="chatbot-container">
         <div class="chatbot-window" id="chatbot-window">
             <div class="chatbot-header">
-                <img src="/images/robot-avatar.png" alt="大川" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px;">
+                <img src="/images/robot-avatar.png" alt="大川" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px;" loading="lazy">
                 <span class="chatbot-title">大川</span>
                 <button class="chatbot-close" id="chatbot-close">&times;</button>
             </div>
@@ -461,7 +461,7 @@
             </div>
         </div>
         <button class="chatbot-toggle" id="chatbot-toggle">
-            <img src="/images/robot-avatar.png" alt="大川" style="width: 32px; height: 32px; border-radius: 50%;">
+            <img src="/images/robot-avatar.png" alt="大川" style="width: 32px; height: 32px; border-radius: 50%;" loading="lazy">
         </button>
     </div>
 
