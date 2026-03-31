@@ -50,15 +50,26 @@ const handleImageUpload = (req, fileField = 'avatar') => {
   });
 };
 
-// 获取所有成员（公开）
+// 获取所有成员（公开，支持分页）
 router.get('/', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const offset = (page - 1) * limit;
+
     const members = await query(`
       SELECT * FROM members 
       ORDER BY join_date DESC, created_at DESC
-    `);
-    
-    res.json(members);
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await query('SELECT COUNT(*) as total FROM members');
+    const total = countResult[0].total;
+
+    res.json({
+      members,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('获取成员失败:', error);
     res.status(500).json({ error: '获取成员失败' });

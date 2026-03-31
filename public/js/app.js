@@ -3,6 +3,37 @@ const API_BASE = '/api';
 let currentUser = null;
 let token = localStorage.getItem('token');
 
+// 分页状态
+let modpackCurrentPage = 1;
+let memberCurrentPage = 1;
+let messageCurrentPage = 1;
+
+// 通用分页渲染函数
+function renderPagination(containerId, pagination, onChangeFn) {
+    const { page, pages } = pagination;
+    if (pages <= 1) {
+        const el = document.getElementById(containerId);
+        if (el) el.remove();
+        return;
+    }
+    let el = document.getElementById(containerId);
+    if (!el) {
+        const parent = document.getElementById(containerId.replace('-pagination', '-page'));
+        if (parent) {
+            parent.insertAdjacentHTML('beforeend', `<div class="pagination" id="${containerId}" style="margin-top: 25px; text-align: center; padding: 15px 0;"></div>`);
+            el = document.getElementById(containerId);
+        }
+    }
+    if (!el) return;
+    const prevDisabled = page <= 1 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : '';
+    const nextDisabled = page >= pages ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : '';
+    el.innerHTML = `
+        <button class="btn btn-secondary" onclick="${onChangeFn}(-1)" ${prevDisabled}>上一页</button>
+        <span style="margin: 0 15px; font-size: 14px; color: var(--text-secondary);">第 ${page} 页 / 共 ${pages} 页</span>
+        <button class="btn btn-secondary" onclick="${onChangeFn}(1)" ${nextDisabled}>下一页</button>
+    `;
+}
+
 // 应用初始化
 document.addEventListener('DOMContentLoaded', function() {
     initApp();
@@ -200,17 +231,26 @@ function createModpackCard(modpack) {
     return card;
 }
 
-// 加载成员页面
+// 加载成员页面（分页）
 async function loadMembersPage() {
     try {
-        const response = await fetch(`${API_BASE}/members`);
+        const response = await fetch(`${API_BASE}/members?page=${memberCurrentPage}&limit=12`);
         if (response.ok) {
-            const members = await response.json();
-            displayMembers(members);
+            const data = await response.json();
+            displayMembers(data.members);
+            renderPagination('member-pagination', data.pagination, 'changeMemberPage');
         }
     } catch (error) {
         console.error('加载成员失败:', error);
     }
+}
+
+// 切换成员页码
+function changeMemberPage(direction) {
+    const newPage = memberCurrentPage + direction;
+    if (newPage < 1) return;
+    memberCurrentPage = newPage;
+    loadMembersPage();
 }
 
 // 显示成员
@@ -2161,6 +2201,7 @@ async function showStoryDetail(storyId) {
                 <div id="comments-section" class="comments-section" data-story-id="${story.id}">
                     <h3>💬 评论区</h3>
                     <div id="comments-list"></div>
+                    <div id="comments-pagination"></div>
                     
                     ${currentUser ? `
                         <div class="comment-form">
@@ -2431,28 +2472,48 @@ async function deleteStory(storyId) {
     }
 }
 
-// 加载评论（支持嵌套回复）
-async function loadComments(storyId) {
+// 加载评论（支持嵌套回复，支持分页）
+let storyCommentCurrentPage = 1;
+
+async function loadComments(storyId, page = 1) {
     try {
-        const response = await fetch(`${API_BASE}/stories/${storyId}/comments`);
+        const response = await fetch(`${API_BASE}/stories/${storyId}/comments?page=${page}&limit=10`);
         if (!response.ok) {
             throw new Error('获取评论失败');
         }
         
-        const comments = await response.json();
+        const data = await response.json();
         const container = document.getElementById('comments-list');
         
-        if (comments.length === 0) {
+        if (data.comments.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">暂无评论，快来发表第一条评论吧！</p>';
+            document.getElementById('comments-pagination').innerHTML = '';
             return;
         }
         
         // 只渲染顶层评论，回复默认折叠
-        container.innerHTML = comments.map(comment => renderComment(comment, storyId)).join('');
+        container.innerHTML = data.comments.map(comment => renderComment(comment, storyId)).join('');
+        
+        // 渲染评论分页
+        renderPagination('comments-pagination', data.pagination, 'changeCommentPage');
     } catch (error) {
         console.error('加载评论失败:', error);
         document.getElementById('comments-list').innerHTML = '<p style="text-align: center; color: red;">加载评论失败</p>';
     }
+}
+
+// 切换评论页码
+function changeCommentPage(direction) {
+    const storyId = document.getElementById('comments-section')?.dataset.storyId;
+    if (!storyId) return;
+    
+    const newPage = storyCommentCurrentPage + direction;
+    if (newPage < 1) return;
+    
+    storyCommentCurrentPage = newPage;
+    loadComments(storyId, newPage);
+    // 滚动到评论区顶部
+    document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // 渲染单条评论（回复默认折叠）

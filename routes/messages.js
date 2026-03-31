@@ -6,18 +6,31 @@ const { notifyNewMessage } = require('../utils/adminNotify');
 
 const router = express.Router();
 
-// 获取所有留言（公开，按时间倒序）
+// 获取所有留言（公开，按时间倒序，支持分页）
 router.get('/', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const offset = (page - 1) * limit;
+
     const messages = await query(`
       SELECT m.*, u.username, u.display_name 
       FROM messages m 
       JOIN users u ON m.user_id = u.id 
       WHERE m.parent_id IS NULL
       ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await query(`
+      SELECT COUNT(*) as total FROM messages WHERE parent_id IS NULL
     `);
-    
-    res.json(messages);
+    const total = countResult[0].total;
+
+    res.json({
+      messages,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('获取留言失败:', error);
     res.status(500).json({ error: '获取留言失败' });

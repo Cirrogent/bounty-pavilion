@@ -207,40 +207,64 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
   }
 });
 
-// 获取文章评论（支持回复）
+// 获取文章评论（支持回复，支持分页）
 router.get('/:id/comments', async (req, res) => {
   try {
     const storyId = parseInt(req.params.id);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
     
-    // 获取所有评论
-    const allComments = query(
+    // 获取根评论（支持分页）
+    const rootComments = query(
       `SELECT sc.*, u.username, u.avatar, u.role 
        FROM story_comments sc
        JOIN users u ON sc.user_id = u.id
-       WHERE sc.story_id = ?
+       WHERE sc.story_id = ? AND sc.parent_id IS NULL
+       ORDER BY sc.created_at ASC
+       LIMIT ? OFFSET ?`,
+      [storyId, limit, offset]
+    );
+
+    // 获取所有子评论（不分页，全部返回）
+    const allReplies = query(
+      `SELECT sc.*, u.username, u.avatar, u.role 
+       FROM story_comments sc
+       JOIN users u ON sc.user_id = u.id
+       WHERE sc.story_id = ? AND sc.parent_id IS NOT NULL
        ORDER BY sc.created_at ASC`,
       [storyId]
     );
 
     // 构建评论树
     const commentMap = {};
-    allComments.forEach(comment => {
+    rootComments.forEach(comment => {
+      comment.replies = [];
+      commentMap[comment.id] = comment;
+    });
+    allReplies.forEach(comment => {
       comment.replies = [];
       commentMap[comment.id] = comment;
     });
 
-    const rootComments = [];
-    allComments.forEach(comment => {
-      if (comment.parent_id) {
-        if (commentMap[comment.parent_id]) {
-          commentMap[comment.parent_id].replies.push(comment);
-        }
-      } else {
-        rootComments.push(comment);
+    // 将子评论挂到父评论下
+    allReplies.forEach(comment => {
+      if (comment.parent_id && commentMap[comment.parent_id]) {
+        commentMap[comment.parent_id].replies.push(comment);
       }
     });
 
-    res.json(rootComments);
+    // 获取总评论数用于分页
+    const countResult = query(
+      'SELECT COUNT(*) as total FROM story_comments WHERE story_id = ? AND parent_id IS NULL',
+      [storyId]
+    );
+    const total = countResult[0].total;
+
+    res.json({
+      comments: rootComments,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('获取评论失败:', error);
     res.status(500).json({ error: '获取评论失败' });

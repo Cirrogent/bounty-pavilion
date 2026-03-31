@@ -56,18 +56,29 @@ const handleImageUpload = (req, fileField = 'image') => {
   });
 };
 
-// 获取所有整合包（公开）- 只显示已发布的
+// 获取所有整合包（公开）- 只显示已发布的，支持分页
 router.get('/', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const offset = (page - 1) * limit;
+
     const modpacks = await query(`
       SELECT m.*, u.username as author_name 
       FROM modpacks m 
       LEFT JOIN users u ON m.author_id = u.id 
       WHERE m.status = 'published'
       ORDER BY m.created_at DESC
-    `);
-    
-    res.json(modpacks);
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await query(`SELECT COUNT(*) as total FROM modpacks WHERE status = 'published'`);
+    const total = countResult[0].total;
+
+    res.json({
+      modpacks,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('获取整合包失败:', error);
     res.status(500).json({ error: '获取整合包失败' });
