@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const messages = await query(`
-      SELECT m.*, u.username 
+      SELECT m.*, u.username, u.display_name 
       FROM messages m 
       JOIN users u ON m.user_id = u.id 
       WHERE m.parent_id IS NULL
@@ -43,7 +43,7 @@ router.post('/', authenticateToken, detectProfanity, async (req, res) => {
     );
     
     const newMessage = await get(`
-      SELECT m.*, u.username 
+      SELECT m.*, u.username, u.display_name 
       FROM messages m 
       JOIN users u ON m.user_id = u.id 
       WHERE m.id = ?
@@ -88,7 +88,7 @@ router.post('/:id/reply', authenticateToken, detectProfanity, async (req, res) =
     );
     
     const newReply = await get(`
-      SELECT m.*, u.username 
+      SELECT m.*, u.username, u.display_name 
       FROM messages m 
       JOIN users u ON m.user_id = u.id 
       WHERE m.id = ?
@@ -132,7 +132,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 router.get('/:id/replies', async (req, res) => {
   try {
     const replies = await query(`
-      SELECT m.*, u.username 
+      SELECT m.*, u.username, u.display_name 
       FROM messages m 
       JOIN users u ON m.user_id = u.id 
       WHERE m.parent_id = ?

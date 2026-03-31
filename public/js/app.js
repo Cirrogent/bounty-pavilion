@@ -277,7 +277,7 @@ function createMessageItem(message) {
     
     item.innerHTML = `
         <div class="message-header">
-            <span class="message-author">${message.username}</span>
+            <span class="message-author">${message.display_name || message.username}</span>
             <span class="message-time">${time}</span>
             ${currentUser && (currentUser.id === message.user_id || currentUser.role === 'admin') ? `
                 <button class="btn btn-small btn-danger" onclick="deleteMessage(${message.id})" style="margin-left: auto;">删除</button>
