@@ -20,6 +20,9 @@ async function initApp() {
     // 初始化表单
     initForms();
     
+    // 初始化珍宝阁按钮事件（在DOM中一次性绑定）
+    bindGalleryButtons();
+    
     // 加载首页数据
     loadHomePage();
     
@@ -121,6 +124,7 @@ function loadPageData(page) {
             loadReviewPage();
             break;
         case 'gallery':
+            updateAdminFeatures();
             loadGalleryPage();
             break;
     }
@@ -1366,6 +1370,8 @@ function updateAdminFeatures() {
             galleryUploadBtn.style.display = 'none';
             galleryApplyBtn.style.display = 'inline-block';
         }
+        // 显示按钮后立即绑定事件
+        bindGalleryButtons();
         
         // 只有管理员可以管理成员和查看审核
         if (currentUser.role === 'admin') {
@@ -3599,31 +3605,42 @@ async function loadGalleryPage() {
     document.getElementById('gallery-grid').innerHTML = '';
     document.getElementById('gallery-load-more').style.display = 'none';
 
-    // 延迟绑定事件，确保 DOM 完全加载
-    setTimeout(() => {
-        const uploadBtn = document.getElementById('gallery-upload-btn');
-        const applyBtn = document.getElementById('gallery-apply-btn');
-        
-        console.log('珍宝阁按钮绑定检查:', { uploadBtn, applyBtn, currentUser });
-        
-        if (uploadBtn) {
-            uploadBtn.onclick = () => showGalleryUploadModal(false);
-            uploadBtn.style.pointerEvents = 'auto';
-            console.log('上传按钮已绑定');
-        } else {
-            console.error('上传按钮未找到!');
-        }
-        
-        if (applyBtn) {
-            applyBtn.onclick = () => showGalleryUploadModal(true);
-            applyBtn.style.pointerEvents = 'auto';
-            console.log('申请按钮已绑定');
-        } else {
-            console.error('申请按钮未找到!');
-        }
-    }, 100);
+    // 确保按钮可见且可点击
+    updateAdminFeatures();
 
     await loadGalleryItems();
+}
+
+// 绑定珍宝阁按钮事件（使用 addEventListener，只在DOM中绑定一次）
+let _galleryBtnsBound = false;
+function bindGalleryButtons() {
+    if (_galleryBtnsBound) return; // 已绑定过就不再重复
+    _galleryBtnsBound = true;
+
+    const uploadBtn = document.getElementById('gallery-upload-btn');
+    const applyBtn = document.getElementById('gallery-apply-btn');
+    
+    console.log('珍宝阁按钮绑定:', { uploadBtn: !!uploadBtn, applyBtn: !!applyBtn, currentUser: !!currentUser });
+    
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('上传按钮被点击!');
+            showGalleryUploadModal(false);
+        }, true); // capture阶段捕获
+        console.log('上传按钮事件已绑定');
+    }
+    
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('申请按钮被点击!');
+            showGalleryUploadModal(true);
+        }, true); // capture阶段捕获
+        console.log('申请按钮事件已绑定');
+    }
 }
 
 // 加载珍宝阁列表
@@ -3954,17 +3971,16 @@ function previewGalleryFile(input) {
 async function submitGalleryUpload(isApply) {
     const title = document.getElementById('gallery-upload-title').value.trim();
     const description = document.getElementById('gallery-upload-desc').value.trim();
-    const file = fileInput ? fileInput.files[0] : null;
     const fileInputEl = document.getElementById('gallery-file-input');
-    const file2 = fileInputEl ? fileInputEl.files[0] : null;
+    const file = fileInputEl ? fileInputEl.files[0] : null;
 
     if (!title) { showError('请填写标题'); return; }
-    if (!file2) { showError('请选择文件'); return; }
+    if (!file) { showError('请选择文件'); return; }
 
     const formData = new FormData();
     formData.append('title', title);
     formData.append('description', description);
-    formData.append('file', file2);
+    formData.append('file', file);
 
     try {
         const url = isApply ? (API_BASE + '/gallery/apply') : (API_BASE + '/gallery');
