@@ -3599,11 +3599,29 @@ async function loadGalleryPage() {
     document.getElementById('gallery-grid').innerHTML = '';
     document.getElementById('gallery-load-more').style.display = 'none';
 
-    const uploadBtn = document.getElementById('gallery-upload-btn');
-    const applyBtn = document.getElementById('gallery-apply-btn');
-    
-    if (uploadBtn) uploadBtn.onclick = () => showGalleryUploadModal(false);
-    if (applyBtn) applyBtn.onclick = () => showGalleryUploadModal(true);
+    // 延迟绑定事件，确保 DOM 完全加载
+    setTimeout(() => {
+        const uploadBtn = document.getElementById('gallery-upload-btn');
+        const applyBtn = document.getElementById('gallery-apply-btn');
+        
+        console.log('珍宝阁按钮绑定检查:', { uploadBtn, applyBtn, currentUser });
+        
+        if (uploadBtn) {
+            uploadBtn.onclick = () => showGalleryUploadModal(false);
+            uploadBtn.style.pointerEvents = 'auto';
+            console.log('上传按钮已绑定');
+        } else {
+            console.error('上传按钮未找到!');
+        }
+        
+        if (applyBtn) {
+            applyBtn.onclick = () => showGalleryUploadModal(true);
+            applyBtn.style.pointerEvents = 'auto';
+            console.log('申请按钮已绑定');
+        } else {
+            console.error('申请按钮未找到!');
+        }
+    }, 100);
 
     await loadGalleryItems();
 }
