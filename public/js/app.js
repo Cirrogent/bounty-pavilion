@@ -8,8 +8,8 @@ let modpackCurrentPage = 1;
 let memberCurrentPage = 1;
 let messageCurrentPage = 1;
 
-// 通用分页渲染函数
-function renderPagination(containerId, pagination, onChangeFn) {
+// 通用分页渲染函数（支持URL路由）
+function renderPagination(containerId, pagination, pageType) {
     const { page, pages } = pagination;
     if (pages <= 1) {
         const el = document.getElementById(containerId);
@@ -25,13 +25,43 @@ function renderPagination(containerId, pagination, onChangeFn) {
         }
     }
     if (!el) return;
+    
+    // 生成URL
+    const currentPath = window.location.pathname;
+    const basePath = currentPath.split('?')[0];
+    const prevPage = page - 1;
+    const nextPage = page + 1;
+    
+    const prevUrl = prevPage >= 1 ? `${basePath}?page=${prevPage}` : '#';
+    const nextUrl = nextPage <= pages ? `${basePath}?page=${nextPage}` : '#';
     const prevDisabled = page <= 1 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : '';
     const nextDisabled = page >= pages ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : '';
+    
     el.innerHTML = `
-        <button class="btn btn-secondary" onclick="${onChangeFn}(-1)" ${prevDisabled}>上一页</button>
+        <a href="${prevUrl}" class="btn btn-secondary" ${prevDisabled} onclick="changePage('${pageType}', -1); return false;">上一页</a>
         <span style="margin: 0 15px; font-size: 14px; color: var(--text-secondary);">第 ${page} 页 / 共 ${pages} 页</span>
-        <button class="btn btn-secondary" onclick="${onChangeFn}(1)" ${nextDisabled}>下一页</button>
+        <a href="${nextUrl}" class="btn btn-secondary" ${nextDisabled} onclick="changePage('${pageType}', 1); return false;">下一页</a>
     `;
+}
+
+// 切换页面（更新URL）
+function changePage(pageType, direction) {
+    const currentPath = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentPage = parseInt(urlParams.get('page') || '1');
+    const newPage = currentPage + direction;
+    
+    if (newPage < 1) return;
+    
+    // 更新URL参数
+    urlParams.set('page', newPage);
+    const newUrl = `${currentPath}?${urlParams.toString()}`;
+    
+    // 使用History API更新URL（不刷新页面）
+    window.history.pushState({ pageType, page: newPage }, '', newUrl);
+    
+    // 重新加载当前页面
+    parseUrlAndNavigate();
 }
 
 // 应用初始化
@@ -54,8 +84,13 @@ async function initApp() {
     // 初始化珍宝阁按钮事件（在DOM中一次性绑定）
     bindGalleryButtons();
     
-    // 加载首页数据
-    loadHomePage();
+    // 解析URL并加载对应页面
+    parseUrlAndNavigate();
+    
+    // 监听浏览器前进/后退
+    window.addEventListener('popstate', () => {
+        parseUrlAndNavigate();
+    });
     
     // 初始化模态框
     initModal();
@@ -161,13 +196,14 @@ function loadPageData(page) {
     }
 }
 
-// 加载首页数据
+// 加载首页数据（整合包分页）
 async function loadHomePage() {
     try {
-        const response = await fetch(`${API_BASE}/modpacks`);
+        const response = await fetch(`${API_BASE}/modpacks?page=${modpackCurrentPage}&limit=12`);
         if (response.ok) {
-            const modpacks = await response.json();
-            displayModpacks(modpacks);
+            const data = await response.json();
+            displayModpacks(data.modpacks);
+            renderPagination('modpack-pagination', data.pagination, 'modpack');
         }
     } catch (error) {
         console.error('加载整合包失败:', error);
@@ -238,7 +274,7 @@ async function loadMembersPage() {
         if (response.ok) {
             const data = await response.json();
             displayMembers(data.members);
-            renderPagination('member-pagination', data.pagination, 'changeMemberPage');
+            renderPagination('member-pagination', data.pagination, 'member');
         }
     } catch (error) {
         console.error('加载成员失败:', error);
@@ -293,13 +329,14 @@ function createMemberCard(member) {
     return card;
 }
 
-// 加载留言板页面
+// 加载留言板页面（分页）
 async function loadMessagesPage() {
     try {
-        const response = await fetch(`${API_BASE}/messages`);
+        const response = await fetch(`${API_BASE}/messages?page=${messageCurrentPage}&limit=15`);
         if (response.ok) {
-            const messages = await response.json();
-            displayMessages(messages);
+            const data = await response.json();
+            displayMessages(data.messages);
+            renderPagination('message-pagination', data.pagination, 'message');
         }
     } catch (error) {
         console.error('加载留言失败:', error);
@@ -2495,7 +2532,7 @@ async function loadComments(storyId, page = 1) {
         container.innerHTML = data.comments.map(comment => renderComment(comment, storyId)).join('');
         
         // 渲染评论分页
-        renderPagination('comments-pagination', data.pagination, 'changeCommentPage');
+        renderPagination('comments-pagination', data.pagination, 'comment');
     } catch (error) {
         console.error('加载评论失败:', error);
         document.getElementById('comments-list').innerHTML = '<p style="text-align: center; color: red;">加载评论失败</p>';
@@ -4148,4 +4185,42 @@ async function rejectGalleryApp(id) {
         if (res.ok) { showSuccessMessage('已拒绝'); loadReviewPage(); }
         else { const data = await res.json(); showError(data.error || '操作失败'); }
     } catch (e) { showError('操作失败'); }
+}
+
+// 解析URL并导航到对应页面
+function parseUrlAndNavigate() {
+    const path = window.location.pathname;
+    const search = window.location.search;
+    
+    // 解析URL参数
+    const urlParams = new URLSearchParams(search);
+    const pageParam = urlParams.get('page');
+    const params = {};
+    if (pageParam) params.page = parseInt(pageParam);
+    
+    // 根据路径确定页面
+    if (path === '/' || path === '/index.html' || path === '') {
+        navigateToPage('home', params);
+    } else if (path.startsWith('/members')) {
+        navigateToPage('members', params);
+    } else if (path.startsWith('/messages')) {
+        navigateToPage('messages', params);
+    } else if (path.startsWith('/stories')) {
+        if (path.includes('/page/')) {
+            // 文章详情页的分页，如 /stories/123/page/2/
+            const parts = path.split('/');
+            const storyId = parts[2];
+            const pageNum = parts[4];
+            if (storyId) {
+                showStoryDetail(storyId, { page: pageNum ? parseInt(pageNum) : 1 });
+            }
+        } else {
+            navigateToPage('stories', params);
+        }
+    } else if (path.startsWith('/gallery')) {
+        navigateToPage('gallery', params);
+    } else {
+        // 默认首页
+        navigateToPage('home', params);
+    }
 }
