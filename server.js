@@ -42,6 +42,14 @@ app.use(fileUpload({
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API响应禁用缓存，确保数据实时性
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // 确保上传目录存在
 const uploadsDir = process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/modpacks' : path.join(__dirname, 'uploads', 'modpacks');
 if (!fs.existsSync(uploadsDir)) {

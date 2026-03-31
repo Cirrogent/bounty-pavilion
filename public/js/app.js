@@ -148,7 +148,11 @@ function displayModpacks(modpacks) {
     const container = document.getElementById('modpacks-grid');
     container.innerHTML = '';
     
+    // 按ID去重，防止重复渲染
+    const seen = new Set();
     modpacks.forEach(modpack => {
+        if (seen.has(modpack.id)) return;
+        seen.add(modpack.id);
         const card = createModpackCard(modpack);
         container.appendChild(card);
     });
@@ -214,7 +218,11 @@ function displayMembers(members) {
     const container = document.getElementById('members-grid');
     container.innerHTML = '';
     
+    // 按ID去重，防止重复渲染
+    const seen = new Set();
     members.forEach(member => {
+        if (seen.has(member.id)) return;
+        seen.add(member.id);
         const card = createMemberCard(member);
         container.appendChild(card);
     });
@@ -3654,7 +3662,12 @@ async function loadGalleryItems() {
         const data = await response.json();
 
         const grid = document.getElementById('gallery-grid');
+        // 按ID去重，防止重复渲染
+        const existingIds = new Set();
+        grid.querySelectorAll('[data-gallery-id]').forEach(el => existingIds.add(el.dataset.galleryId));
+        
         data.items.forEach(item => {
+            if (existingIds.has(String(item.id))) return;
             grid.appendChild(createGalleryCard(item));
         });
 
@@ -3678,6 +3691,7 @@ async function loadMoreGallery() {
 function createGalleryCard(item) {
     const div = document.createElement('div');
     div.className = 'gallery-item';
+    div.setAttribute('data-gallery-id', item.id);
     div.onclick = () => showGalleryDetail(item.id);
 
     const isVideo = item.file_type === 'video';

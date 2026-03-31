@@ -234,18 +234,30 @@ async function init() {
   try { db.run(`ALTER TABLE notifications ADD COLUMN sender_id INTEGER`); } catch(e) {}
 
   // 保存数据库到文件
-  saveDb();
+  saveDb(true);
 
   // 创建默认管理员
   await createDefaultAdmin();
 }
 
-// 保存数据库到文件
-function saveDb() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+// 保存数据库到文件（加写入保护）
+let saveDbPending = false;
+function saveDb(force = false) {
+  if (!db) return;
+  // force模式下立即写入（用于初始化等关键场景）
+  if (force || !saveDbPending) {
+    try {
+      const data = db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(dbPath, buffer);
+    } catch(e) {
+      console.error('数据库保存失败:', e);
+    }
+    if (!force) {
+      saveDbPending = true;
+      // 标记为已写入，短时间内不再重复写入
+      setTimeout(() => { saveDbPending = false; }, 100);
+    }
   }
 }
 
