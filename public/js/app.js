@@ -137,8 +137,8 @@ function initNavigation() {
     });
 }
 
-// 导航到指定页面
-function navigateToPage(page) {
+// 导航到指定页面（支持URL路由分页）
+function navigateToPage(page, params = {}) {
     // 隐藏所有页面
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     
@@ -163,24 +163,27 @@ function navigateToPage(page) {
             }
         });
         
-        // 加载页面数据
-        loadPageData(page);
+        // 加载页面数据（传递分页参数）
+        loadPageData(page, params);
     }
 }
 
-// 加载页面数据
-function loadPageData(page) {
+// 加载页面数据（支持分页参数）
+function loadPageData(page, params = {}) {
     switch (page) {
         case 'home':
+            modpackCurrentPage = params.page || 1;
             loadHomePage();
             break;
         case 'stories':
             loadStoriesPage();
             break;
         case 'members':
+            memberCurrentPage = params.page || 1;
             loadMembersPage();
             break;
         case 'messages':
+            messageCurrentPage = params.page || 1;
             loadMessagesPage();
             break;
         case 'profile':
